@@ -1,0 +1,35 @@
+# Binaries
+authorization-service
+*.exe
+*.out
+
+# Build artifacts
+/build
+/dist
+
+# Configuration files
+.env
+
+# Logs
+*.log
+
+# Dependency directories
+/vendor
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Go specific
+*.test
+*.cover
+
+# Docker
+docker-compose.override.yml
+
+# Miscellaneous
+*.swp

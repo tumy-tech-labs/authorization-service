@@ -1,0 +1,11 @@
+- id: "1"
+  resource: "file1"
+  action: "read"
+  effect: "allow"
+  conditions: []
+
+- id: "2"
+  resource: "file2"
+  action: "write"
+  effect: "deny"
+  conditions: []
