@@ -104,7 +104,8 @@ policies:
   conditions: []
 ```
 
-Adding a New Policy
+#### Adding a New Policy
+
 Open the configs/policies.yaml file.
 
 Add a new policy to the file. For example, to allow user3 to write to file3:
