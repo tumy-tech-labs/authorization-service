@@ -26,6 +26,7 @@ Create a `.env` file in the project root with the following content:
 
 ```dotenv
 JWT_SECRET=your-256-bit-secret
+```
 
 #### Generate JWT
 
