@@ -65,7 +65,7 @@ JWT_SECRET=your-256-bit-secret
     ```bash
     curl -X POST http://localhost:8080/check-access \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6xxxxxxxxxxxVwF5kRkit1zVs6UzYzTkEBinY7YMUNvxwL-2-Mhf32g" \
+        -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6xxxxxxxxxxx" \
         -d '{                  
             "subject": "user1", 
             "resource": "file1",
