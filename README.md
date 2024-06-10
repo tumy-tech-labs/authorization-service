@@ -18,54 +18,55 @@ Authorization Service is an open-source authorization service that reads policie
     cd authorization-service
     ```
 
+2. Set up the `.env` file in the project root with the following variables:
+
+    ```sh
+    CLIENT_ID=my-client-id
+    CLIENT_SECRET=my-client-secret
+    JWT_SECRET=my-jwt-secret
+    PORT=8080
+    ```
+
 ### Usage
-
-#### Set Up Environment Variables
-
-Create a `.env` file in the project root with the following content:
-
-```dotenv
-JWT_SECRET=your-256-bit-secret
-```
 
 #### Generate JWT
 
-1. Navigate to the scripts directory and run the JWT generation script:
+To generate a client credential JWT token:
 
-    ```bash
+1. Navigate to the `scripts` directory:
+
+    ```sh
     cd scripts
+    ```
+
+2. Run the `generate_jwt.go` script:
+
+    ```sh
     go run generate_jwt.go
     ```
 
-    Response:
+3. The script will output a JWT token:
 
-    ```bash
-    Generated JWT Token:  eyJhbGciOiJIUzI1NiIsInR5cCI6xxxxxxxxxxx
-    ```
-
-#### Start the Server
-
-1. Start the authorization service:
-
-    ```bash
-    go run cmd/main.go
-    ```
-
-2. Alternatively, you can build and run the Docker container:
-
-    ```bash
-    docker build -t authorization-service .
-    docker run -p 8080:8080 authorization-service
+    ```sh
+    Generated JWT Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     ```
 
 #### Request Policy Decision
 
-1. Use the generated JWT token in the Authorization header to make a policy decision request:
+Use the generated JWT token to request a policy decision from the authorization service.
 
-    ```bash
+1. Start the server:
+
+    ```sh
+    go run main.go
+    ```
+
+2. Send a POST request to the `/check-access` endpoint:
+
+    ```sh
     curl -X POST http://localhost:8080/check-access \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6xxxxxxxxxxx" \
+        -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
         -d '{                  
             "subject": "user1", 
             "resource": "file1",
@@ -74,27 +75,50 @@ JWT_SECRET=your-256-bit-secret
         }'
     ```
 
-    Response:
+3. The service will respond with the policy decision:
 
     ```json
     {
-      "allowed": true
+        "allowed": true
     }
     ```
 
-## Configuration
+### Development
 
-Policies are defined in `configs/policies.yaml`. You can modify this file to add or update policies. Here is an example of the `policies.yaml` file:
+To develop and test the service, follow these steps:
 
-```yaml
-- id: "1"
-  resource: "file1"
-  action: "read"
-  effect: "allow"
-  conditions: []
+1. Install dependencies:
 
-- id: "2"
-  resource: "file2"
-  action: "write"
-  effect: "deny"
-  conditions: []
+    ```sh
+    go mod tidy
+    ```
+
+2. Run tests:
+
+    ```sh
+    go test ./...
+    ```
+
+### Docker Deployment
+
+To build and run the service using Docker:
+
+1. Build the Docker image:
+
+    ```sh
+    docker build -t authorization-service .
+    ```
+
+2. Run the Docker container:
+
+    ```sh
+    docker run -d -p 8080:8080 --env-file .env authorization-service
+    ```
+
+### Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+### License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
