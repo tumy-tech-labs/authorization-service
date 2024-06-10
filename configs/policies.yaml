@@ -9,3 +9,9 @@
   action: "write"
   effect: "deny"
   conditions: []
+
+- id: "policy3"
+  resource: "file3"
+  action: "write"
+  effect: "allow"
+  conditions: []

@@ -83,6 +83,48 @@ Use the generated JWT token to request a policy decision from the authorization 
     }
     ```
 
+#### Modifying Policies
+
+To modify the policies, edit the `policies.yaml` file located in the `configs` directory.
+
+#### Example `policies.yaml`
+
+```yaml
+policies:
+- id: "1"
+  resource: "file1"
+  action: "read"
+  effect: "allow"
+  conditions: []
+
+- id: "2"
+  resource: "file2"
+  action: "write"
+  effect: "deny"
+  conditions: []
+```
+
+Adding a New Policy
+Open the configs/policies.yaml file.
+
+Add a new policy to the file. For example, to allow user3 to write to file3:
+
+```yaml
+policies:
+- id: "3"
+  resource: "file3"
+  action: "write"
+  effect: "allow"
+  conditions: []
+```
+
+Save the file and restart the authorization service to apply the changes:
+
+```bash
+go run main.go
+```
+
+
 ### Development
 
 To develop and test the service, follow these steps:
