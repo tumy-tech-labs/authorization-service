@@ -91,17 +91,45 @@ To modify the policies, edit the `policies.yaml` file located in the `configs` d
 
 ```yaml
 policies:
-- id: "1"
-  resource: "file1"
-  action: "read"
-  effect: "allow"
-  conditions: []
+  - id: "policy1"
+    description: "Allow admin to read any file"
+    subjects: 
+      - role: "admin"
+    resource: 
+      - "*"
+    action: 
+      - "read"
+    effect: "allow"
 
-- id: "2"
-  resource: "file2"
-  action: "write"
-  effect: "deny"
-  conditions: []
+  - id: "policy2"
+    description: "Allow admin to write any file"
+    subjects: 
+      - role: "admin"
+    resource: 
+      - "*"
+    action: 
+      - "write"
+    effect: "allow"
+
+  - id: "policy3"
+    description: "Allow editor to read any file"
+    subjects: 
+      - role: "editor"
+    resource: 
+      - "*"
+    action: 
+      - "read"
+    effect: "allow"
+
+  - id: "policy4"
+    description: "Allow editor to edit own files"
+    subjects: 
+      - role: "editor"
+    resource: 
+      - "file2"
+    action: 
+      - "edit"
+    effect: "allow"
 ```
 
 #### Adding a New Policy
@@ -112,11 +140,15 @@ Add a new policy to the file. For example, to allow user3 to write to file3:
 
 ```yaml
 policies:
-- id: "3"
-  resource: "file3"
-  action: "write"
-  effect: "allow"
-  conditions: []
+  - id: "policy5"
+    description: "Allow editor to execute own files"
+    subjects: 
+      - role: "editor"
+    resource: 
+      - "file2"
+    action: 
+      - "execute"
+    effect: "allow"
 ```
 
 Save the file and restart the authorization service to apply the changes:
