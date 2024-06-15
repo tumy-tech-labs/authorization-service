@@ -58,7 +58,7 @@ Use the generated JWT token to request a policy decision from the authorization 
 1. Start the server:
 
     ```sh
-    go run main.go
+    go run cmd/main.go
     ```
 
 2. Send a POST request to the `/check-access` endpoint:
@@ -122,9 +122,8 @@ policies:
 Save the file and restart the authorization service to apply the changes:
 
 ```bash
-go run main.go
+go run cmd/main.go
 ```
-
 
 ### Development
 
