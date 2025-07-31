@@ -1,5 +1,14 @@
 package policy
 
+// PolicyEngine represents an engine for policy evaluation.
+//
+// The engine currently performs simple matching on resource and action
+// attributes. Policies may optionally scope themselves to specific roles via
+// the `Subjects` field. This check was previously ignored which meant a policy
+// could be enforced even when the requesting role wasn't included in the
+// policy's subjects. The evaluation now ensures the policy explicitly allows
+// the role before considering resources and actions.
+
 import "fmt"
 
 // PolicyEngine represents an engine for policy evaluation.
@@ -34,12 +43,19 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []
 			if !exists {
 				continue
 			}
-			// debug statements
-			fmt.Println("Resources: ", resource)
-			fmt.Println("Action: ", action)
-			fmt.Println("Policy: ", policy)
-			fmt.Println("Policy Resource: ", policy.Resource)
-			fmt.Println("Policy Action: ", policy.Action)
+			// Ensure the policy applies to the current role
+			if len(policy.Subjects) > 0 {
+				allowed := false
+				for _, subj := range policy.Subjects {
+					if subj.Role == roleName {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					continue
+				}
+			}
 
 			for _, polResource := range policy.Resource {
 				for _, polAction := range policy.Action {
