@@ -29,6 +29,13 @@ Authorization Service is an open-source authorization service that reads policie
 
 ### Usage
 
+#### API Endpoints
+
+| Method | Endpoint       | Description                     |
+|--------|----------------|---------------------------------|
+| POST   | `/check-access`| Evaluate an access request      |
+| POST   | `/reload`      | Reload policies from disk       |
+
 #### Generate JWT
 
 To generate a client credential JWT token:
@@ -86,6 +93,14 @@ Use the generated JWT token to request a policy decision from the authorization 
 #### Modifying Policies
 
 To modify the policies, edit the `policies.yaml` file located in the `configs` directory.
+After saving your changes, trigger a reload without restarting the service:
+
+```sh
+curl -X POST http://localhost:8080/reload \
+    -H "Authorization: Bearer <JWT>"
+```
+
+On success the service logs a message indicating that policies were reloaded.
 
 #### Example `policies.yaml`
 
@@ -134,9 +149,7 @@ policies:
 
 #### Adding a New Policy
 
-Open the configs/policies.yaml file.
-
-Add a new policy to the file. For example, to allow user3 to write to file3:
+Open the configs/policies.yaml file and add a new policy. For example, to allow user3 to write to file3:
 
 ```yaml
 policies:
@@ -151,10 +164,11 @@ policies:
     effect: "allow"
 ```
 
-Save the file and restart the authorization service to apply the changes:
+Save the file and call the `/reload` endpoint to apply the changes:
 
-```bash
-go run cmd/main.go
+```sh
+curl -X POST http://localhost:8080/reload \
+    -H "Authorization: Bearer <JWT>"
 ```
 
 ### Development
