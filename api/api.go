@@ -52,10 +52,8 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Evaluate permissions using the PolicyEngine
-	allowed := policyEngine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
-	fmt.Println("API Response", allowed)
+	decision := policyEngine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
 
 	// Respond with the authorization decision
-	res := map[string]bool{"allowed": allowed}
-	json.NewEncoder(w).Encode(res)
+	json.NewEncoder(w).Encode(decision)
 }
