@@ -71,7 +71,7 @@ Use the generated JWT token to request a policy decision from the authorization 
             "subject": "user1", 
             "resource": "file1",
             "action": "read",
-            "conditions": []
+            "conditions": {}
         }'
     ```
 

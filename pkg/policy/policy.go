@@ -18,11 +18,11 @@ type Subject struct {
 
 // Policy represents an authorization policy.
 type Policy struct {
-	ID          string    `yaml:"id"`
-	Description string    `yaml:"description"`
-	Subjects    []Subject `yaml:"subjects"`
-	Resource    []string  `yaml:"resource"`
-	Action      []string  `yaml:"action"`
-	Effect      string    `yaml:"effect"`
-	Conditions  []string  `yaml:"conditions"`
+	ID          string            `yaml:"id"`
+	Description string            `yaml:"description"`
+	Subjects    []Subject         `yaml:"subjects"`
+	Resource    []string          `yaml:"resource"`
+	Action      []string          `yaml:"action"`
+	Effect      string            `yaml:"effect"`
+	Conditions  map[string]string `yaml:"conditions"`
 }

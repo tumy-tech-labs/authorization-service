@@ -10,6 +10,6 @@
   "subject": "user1",
   "resource": "file1",
   "action": "read",
-  "conditions": []
+  "conditions": {}
 }
 ```

@@ -18,7 +18,7 @@ func NewPolicyEngine(store *PolicyStore) *PolicyEngine {
 // Evaluate determines whether the given subject is allowed to perform the
 // specified action on the resource. It returns a Decision describing the
 // outcome and does not log sensitive data.
-func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []string) Decision {
+func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[string]string) Decision {
 	ctx := map[string]string{
 		"subject":  subject,
 		"resource": resource,
@@ -59,11 +59,15 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []
 				for _, polAction := range policy.Action {
 					if (polResource == "*" || polResource == resource) &&
 						(polAction == "*" || polAction == action) {
+						condResults, ok := evaluateConditions(policy.Conditions, env)
+						if !ok {
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx, ConditionResults: condResults}
+						}
 						switch policy.Effect {
 						case "allow":
-							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx}
+							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx, ConditionResults: condResults}
 						case "deny":
-							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx}
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx, ConditionResults: condResults}
 						}
 					}
 				}
