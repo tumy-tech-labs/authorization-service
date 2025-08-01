@@ -35,6 +35,7 @@ Authorization Service is an open-source authorization service that reads policie
 |--------|----------------|---------------------------------|
 | POST   | `/check-access`| Evaluate an access request      |
 | POST   | `/reload`      | Reload policies from disk       |
+| POST   | `/compile`     | Convert natural language to YAML |
 
 #### Generate JWT
 
@@ -101,6 +102,24 @@ curl -X POST http://localhost:8080/reload \
 ```
 
 On success the service logs a message indicating that policies were reloaded.
+
+#### Compile Natural Language Policy
+
+You can convert an English rule into a YAML policy using either the HTTP API or the CLI.
+
+**API example:**
+
+```sh
+curl -X POST http://localhost:8080/compile \
+    -H "Content-Type: application/json" \
+    -d '{"rule": "Mary can approve invoices"}'
+```
+
+**CLI example:**
+
+```sh
+go run cmd/policyctl/main.go compile "Mary can approve invoices"
+```
 
 #### Example `policies.yaml`
 

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/bradtumy/authorization-service/pkg/policy"
+	"github.com/bradtumy/authorization-service/pkg/policycompiler"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -16,6 +18,7 @@ var (
 	policyEngine *policy.PolicyEngine
 	policyStore  *policy.PolicyStore
 	policyFile   = "configs/policies.yaml"
+	compiler     policycompiler.Compiler
 )
 
 func init() {
@@ -31,6 +34,7 @@ func init() {
 		panic("Failed to load policies: " + err.Error())
 	}
 	policyEngine = policy.NewPolicyEngine(policyStore)
+	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
 }
 
 type AccessRequest struct {
@@ -40,11 +44,16 @@ type AccessRequest struct {
 	Conditions map[string]string `json:"conditions"`
 }
 
+type CompileRequest struct {
+	Rule string `json:"rule"`
+}
+
 func SetupRouter() *mux.Router {
 	router := mux.NewRouter()
 	router.Use(middleware.JWTMiddleware)
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
+	router.HandleFunc("/compile", CompileRule).Methods("POST")
 	return router
 }
 
@@ -74,4 +83,20 @@ func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
 	log.Print("policy reload successful")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("policies reloaded"))
+}
+
+// CompileRule compiles a natural language rule into a YAML policy.
+func CompileRule(w http.ResponseWriter, r *http.Request) {
+	var req CompileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	policy, err := compiler.Compile(req.Rule)
+	if err != nil {
+		http.Error(w, "failed to compile rule: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-yaml")
+	w.Write([]byte(policy))
 }
