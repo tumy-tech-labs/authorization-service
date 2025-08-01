@@ -1,17 +1,11 @@
 package policy
 
-// PolicyEngine represents an engine for policy evaluation.
+// PolicyEngine evaluates policies to determine access decisions.
 //
-// The engine currently performs simple matching on resource and action
-// attributes. Policies may optionally scope themselves to specific roles via
-// the `Subjects` field. This check was previously ignored which meant a policy
-// could be enforced even when the requesting role wasn't included in the
-// policy's subjects. The evaluation now ensures the policy explicitly allows
-// the role before considering resources and actions.
-
-import "fmt"
-
-// PolicyEngine represents an engine for policy evaluation.
+// The engine performs simple matching on resource and action attributes. Policies
+// may optionally scope themselves to specific roles via the `Subjects` field.
+// Evaluation stops at the first matching policy and returns a structured
+// decision describing the result.
 type PolicyEngine struct {
 	store *PolicyStore
 }
@@ -21,25 +15,29 @@ func NewPolicyEngine(store *PolicyStore) *PolicyEngine {
 	return &PolicyEngine{store: store}
 }
 
-// Evaluate evaluates the permission for the given subject, resource, action, and conditions.
-func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []string) bool {
+// Evaluate determines whether the given subject is allowed to perform the
+// specified action on the resource. It returns a Decision describing the
+// outcome and does not log sensitive data.
+func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []string) Decision {
+	ctx := map[string]string{
+		"subject":  subject,
+		"resource": resource,
+		"action":   action,
+	}
+
 	user, exists := pe.store.Users[subject]
-	fmt.Println("::Policy Engine: Subject:", subject)
-	fmt.Println("::Policy Engine: Subject:", user, exists)
 	if !exists {
-		return false // User not found
+		return Decision{Allow: false, Reason: "user not found", Context: ctx}
 	}
 
 	for _, roleName := range user.Roles {
 		role, exists := pe.store.Roles[roleName]
-		fmt.Println("::Policy Engine: Roles", role, exists)
 		if !exists {
 			continue
 		}
 
 		for _, policyID := range role.Policies {
 			policy, exists := pe.store.Policies[policyID]
-			fmt.Println("::Policy Engine: Policy", policy, exists)
 			if !exists {
 				continue
 			}
@@ -59,9 +57,13 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []
 
 			for _, polResource := range policy.Resource {
 				for _, polAction := range policy.Action {
-					if polResource == "*" || polResource == resource {
-						if polAction == "*" || polAction == action {
-							return policy.Effect == "allow"
+					if (polResource == "*" || polResource == resource) &&
+						(polAction == "*" || polAction == action) {
+						switch policy.Effect {
+						case "allow":
+							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx}
+						case "deny":
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx}
 						}
 					}
 				}
@@ -69,5 +71,5 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []
 		}
 	}
 
-	return false // No matching policy found
+	return Decision{Allow: false, Reason: "no matching policy", Context: ctx}
 }
