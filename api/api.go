@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/bradtumy/authorization-service/internal/middleware"
@@ -11,7 +12,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var policyEngine *policy.PolicyEngine
+var (
+	policyEngine *policy.PolicyEngine
+	policyStore  *policy.PolicyStore
+	policyFile   = "configs/policies.yaml"
+)
 
 func init() {
 	err := godotenv.Load(".env")
@@ -20,8 +25,8 @@ func init() {
 		panic("Failed to load .env file")
 	}
 
-	policyStore := policy.NewPolicyStore()
-	err = policyStore.LoadPolicies("configs/policies.yaml")
+	policyStore = policy.NewPolicyStore()
+	err = policyStore.LoadPolicies(policyFile)
 	if err != nil {
 		panic("Failed to load policies: " + err.Error())
 	}
@@ -39,6 +44,7 @@ func SetupRouter() *mux.Router {
 	router := mux.NewRouter()
 	router.Use(middleware.JWTMiddleware)
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
+	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
 	return router
 }
 
@@ -56,4 +62,16 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 
 	// Respond with the authorization decision
 	json.NewEncoder(w).Encode(decision)
+}
+
+// ReloadPolicies reloads policies from the YAML file.
+func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
+	if err := policyStore.LoadPolicies(policyFile); err != nil {
+		log.Printf("policy reload failed: %v", err)
+		http.Error(w, "failed to reload policies", http.StatusInternalServerError)
+		return
+	}
+	log.Print("policy reload successful")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("policies reloaded"))
 }
