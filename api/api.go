@@ -29,10 +29,10 @@ func init() {
 }
 
 type AccessRequest struct {
-	Subject    string   `json:"subject"`
-	Resource   string   `json:"resource"`
-	Action     string   `json:"action"`
-	Conditions []string `json:"conditions"`
+	Subject    string            `json:"subject"`
+	Resource   string            `json:"resource"`
+	Action     string            `json:"action"`
+	Conditions map[string]string `json:"conditions"`
 }
 
 func SetupRouter() *mux.Router {
