@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
+	"github.com/bradtumy/authorization-service/pkg/validator"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -54,6 +56,7 @@ func SetupRouter() *mux.Router {
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
 	router.HandleFunc("/compile", CompileRule).Methods("POST")
+	router.HandleFunc("/validate-policy", ValidatePolicy).Methods("POST")
 	return router
 }
 
@@ -99,4 +102,19 @@ func CompileRule(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/x-yaml")
 	w.Write([]byte(policy))
+}
+
+// ValidatePolicy validates a policy definition provided in the request body.
+func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validator.ValidatePolicyData(data); err != nil {
+		http.Error(w, "invalid policy: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("policy is valid"))
 }
