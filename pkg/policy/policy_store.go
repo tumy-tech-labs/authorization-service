@@ -1,11 +1,12 @@
 package policy
 
 import (
-	"fmt"
 	"io/ioutil"
 	"sync"
 
 	"gopkg.in/yaml.v2"
+
+	"github.com/bradtumy/authorization-service/pkg/validator"
 )
 
 // PolicyStore represents a store for policies, roles, and users.
@@ -33,6 +34,10 @@ func (ps *PolicyStore) LoadPolicies(filePath string) error {
 		return err
 	}
 
+	if err = validator.ValidatePolicyData(data); err != nil {
+		return err
+	}
+
 	var config struct {
 		Roles    []Role   `yaml:"roles"`
 		Users    []User   `yaml:"users"`
@@ -41,13 +46,6 @@ func (ps *PolicyStore) LoadPolicies(filePath string) error {
 
 	if err = yaml.UnmarshalStrict(data, &config); err != nil {
 		return err
-	}
-
-	// basic schema validation
-	for _, p := range config.Policies {
-		if p.ID == "" || len(p.Resource) == 0 || len(p.Action) == 0 || p.Effect == "" {
-			return fmt.Errorf("invalid policy definition for id %s", p.ID)
-		}
 	}
 
 	newRoles := make(map[string]Role)
