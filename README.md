@@ -87,7 +87,14 @@ Use the generated JWT token to request a policy decision from the authorization 
 
     ```json
     {
-        "allowed": true
+        "allow": true,
+        "policy_id": "policy1",
+        "reason": "allowed by policy",
+        "context": {
+            "subject": "user1",
+            "resource": "file1",
+            "action": "read"
+        }
     }
     ```
 

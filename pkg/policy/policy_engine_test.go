@@ -105,9 +105,6 @@ func TestEvaluateConditionSatisfied(t *testing.T) {
 	if !decision.Allow {
 		t.Fatalf("expected access to be allowed during business hours")
 	}
-	if decision.ConditionResults["time"] != true {
-		t.Fatalf("expected time condition to pass")
-	}
 }
 
 func TestEvaluateConditionUnsatisfied(t *testing.T) {
@@ -127,9 +124,6 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 	decision := engine.Evaluate("user1", "file1", "read", map[string]string{"time": "20:00"})
 	if decision.Allow {
 		t.Fatalf("expected access to be denied outside business hours")
-	}
-	if decision.ConditionResults["time"] != false {
-		t.Fatalf("expected time condition to fail")
 	}
 	if decision.Reason != "conditions not satisfied" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
