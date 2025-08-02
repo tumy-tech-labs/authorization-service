@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/bradtumy/authorization-service/pkg/policy"
@@ -18,6 +19,7 @@ var (
 	policyStores  map[string]*policy.PolicyStore
 	policyEngines map[string]*policy.PolicyEngine
 	policyFiles   map[string]string
+	tenants       map[string]Tenant
 	compiler      policycompiler.Compiler
 )
 
@@ -29,6 +31,7 @@ func init() {
 	policyStores = make(map[string]*policy.PolicyStore)
 	policyEngines = make(map[string]*policy.PolicyEngine)
 	policyFiles = make(map[string]string)
+	tenants = make(map[string]Tenant)
 
 	defaultTenant := "default"
 	defaultFile := os.Getenv("POLICY_FILE")
@@ -43,6 +46,7 @@ func init() {
 	policyStores[defaultTenant] = store
 	policyEngines[defaultTenant] = policy.NewPolicyEngine(store)
 	policyFiles[defaultTenant] = defaultFile
+	tenants[defaultTenant] = Tenant{ID: defaultTenant, Name: "default", CreatedAt: time.Now()}
 
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
 }
@@ -64,6 +68,17 @@ type TenantRequest struct {
 	TenantID string `json:"tenantID"`
 }
 
+type CreateTenantRequest struct {
+	TenantID string `json:"tenantID"`
+	Name     string `json:"name"`
+}
+
+type Tenant struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type ValidatePolicyRequest struct {
 	TenantID string `json:"tenantID"`
 	Policy   string `json:"policy"`
@@ -76,6 +91,9 @@ func SetupRouter() *mux.Router {
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
 	router.HandleFunc("/compile", CompileRule).Methods("POST")
 	router.HandleFunc("/validate-policy", ValidatePolicy).Methods("POST")
+	router.HandleFunc("/tenant/create", CreateTenant).Methods("POST")
+	router.HandleFunc("/tenant/delete", DeleteTenant).Methods("POST")
+	router.HandleFunc("/tenant/list", ListTenants).Methods("GET")
 	return router
 }
 
@@ -165,4 +183,59 @@ func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("policy is valid"))
+}
+
+// CreateTenant registers a new tenant with an empty PolicyStore.
+func CreateTenant(w http.ResponseWriter, r *http.Request) {
+	var req CreateTenantRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.TenantID == "" {
+		http.Error(w, "tenantID is required", http.StatusBadRequest)
+		return
+	}
+	if _, exists := tenants[req.TenantID]; exists {
+		http.Error(w, "tenant already exists", http.StatusConflict)
+		return
+	}
+	store := policy.NewPolicyStore()
+	policyStores[req.TenantID] = store
+	policyEngines[req.TenantID] = policy.NewPolicyEngine(store)
+	policyFiles[req.TenantID] = ""
+	tenant := Tenant{ID: req.TenantID, Name: req.Name, CreatedAt: time.Now()}
+	tenants[req.TenantID] = tenant
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tenant)
+}
+
+// DeleteTenant removes a tenant and associated policy data.
+func DeleteTenant(w http.ResponseWriter, r *http.Request) {
+	var req TenantRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	tenant, ok := tenants[req.TenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	delete(policyStores, req.TenantID)
+	delete(policyEngines, req.TenantID)
+	delete(policyFiles, req.TenantID)
+	delete(tenants, req.TenantID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tenant)
+}
+
+// ListTenants returns all registered tenants.
+func ListTenants(w http.ResponseWriter, r *http.Request) {
+	list := make([]Tenant, 0, len(tenants))
+	for _, t := range tenants {
+		list = append(list, t)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(list)
 }

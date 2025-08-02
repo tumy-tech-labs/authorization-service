@@ -38,6 +38,9 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 | POST   | `/check-access` | Evaluate a tenant-scoped access request         |
 | POST   | `/reload`       | Reload policies for a specific tenant from disk |
 | POST   | `/compile`      | Convert natural language to YAML for a tenant   |
+| POST   | `/tenant/create`| Register a new tenant                            |
+| POST   | `/tenant/delete`| Remove an existing tenant                        |
+| GET    | `/tenant/list`  | List all tenants                                |
 
 #### Generate JWT
 
@@ -121,6 +124,35 @@ curl -X POST http://localhost:8080/check-access \
 ```
 
 Each tenant receives a decision based solely on its own policies.
+
+#### Tenant Lifecycle Management
+
+Use the API or the `policyctl` CLI to create, list, and delete tenants.
+
+**API examples:**
+
+```sh
+curl -X POST http://localhost:8080/tenant/create \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <JWT>" \
+    -d '{"tenantID":"acme","name":"Acme Inc"}'
+
+curl -H "Authorization: Bearer <JWT>" http://localhost:8080/tenant/list
+
+curl -X POST http://localhost:8080/tenant/delete \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <JWT>" \
+    -d '{"tenantID":"acme"}'
+```
+
+**CLI examples:**
+
+```sh
+export POLICYCTL_TOKEN=<JWT>
+policyctl tenant create acme
+policyctl tenant list
+policyctl tenant delete acme
+```
 
 #### Modifying Policies
 
