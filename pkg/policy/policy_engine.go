@@ -59,15 +59,15 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 				for _, polAction := range policy.Action {
 					if (polResource == "*" || polResource == resource) &&
 						(polAction == "*" || polAction == action) {
-						condResults, ok := evaluateConditions(policy.Conditions, env)
+						ok := evaluateConditions(policy.Conditions, env)
 						if !ok {
-							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx, ConditionResults: condResults}
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
 						}
 						switch policy.Effect {
 						case "allow":
-							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx, ConditionResults: condResults}
+							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx}
 						case "deny":
-							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx, ConditionResults: condResults}
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx}
 						}
 					}
 				}
