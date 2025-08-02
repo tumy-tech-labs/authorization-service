@@ -73,6 +73,7 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	decision := policyEngine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
 
 	// Respond with the authorization decision
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(decision)
 }
 

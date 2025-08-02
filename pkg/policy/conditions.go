@@ -5,8 +5,10 @@ import "time"
 // now is a variable for mocking current time in tests.
 var now = time.Now
 
-// evaluateConditions checks whether all policy conditions are satisfied using the
-// provided environment values. It returns true if all conditions pass.
+
+// evaluateConditions checks whether all policy conditions are satisfied using
+// the provided environment values.
+
 func evaluateConditions(policyConds map[string]string, env map[string]string) bool {
 	if len(policyConds) == 0 {
 		return true
