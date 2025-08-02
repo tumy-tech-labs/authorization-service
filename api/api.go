@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	if err := godotenv.Load(".env"); err != nil {
+	if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
 		log.Printf("warning: could not load .env file: %v", err)
 	}
 
