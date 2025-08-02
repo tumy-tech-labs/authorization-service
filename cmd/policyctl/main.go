@@ -123,7 +123,7 @@ func handleTenant(args []string) {
 
 func handleGraph(args []string) {
 	if len(args) < 1 {
-		fmt.Println("usage: policyctl graph <add|list> ...")
+		fmt.Println("usage: policyctl graph <add|list|delegate> ...")
 		os.Exit(1)
 	}
 	file := "graph.json"
@@ -137,6 +137,14 @@ func handleGraph(args []string) {
 		g.AddRelation(args[1], args[2])
 		saveGraphFile(file, g)
 		fmt.Println("relationship added")
+	case "delegate":
+		if len(args) < 3 {
+			fmt.Println("usage: policyctl graph delegate <delegator> <delegatee>")
+			os.Exit(1)
+		}
+		g.AddRelation("user:"+args[1], "user:"+args[2])
+		saveGraphFile(file, g)
+		fmt.Println("delegation added")
 	case "list":
 		rels := g.List()
 		for src, targets := range rels {
@@ -145,7 +153,7 @@ func handleGraph(args []string) {
 			}
 		}
 	default:
-		fmt.Println("usage: policyctl graph <add|list> ...")
+		fmt.Println("usage: policyctl graph <add|list|delegate> ...")
 		os.Exit(1)
 	}
 }

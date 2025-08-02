@@ -175,3 +175,49 @@ func TestEvaluateResourceGroup(t *testing.T) {
 		t.Fatalf("expected resource group expansion to allow access")
 	}
 }
+
+func TestEvaluateDelegationChain(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["admin"] = Role{Name: "admin", Policies: []string{"p1"}}
+	store.Users["mary"] = User{Username: "mary", Roles: []string{"admin"}}
+	store.Users["bob"] = User{Username: "bob"}
+	store.Users["alice"] = User{Username: "alice"}
+	store.Policies["p1"] = Policy{
+		ID:       "p1",
+		Subjects: []Subject{{Role: "admin"}},
+		Resource: []string{"file1"},
+		Action:   []string{"read"},
+		Effect:   "allow",
+	}
+	g := graph.New()
+	g.AddRelation("user:alice", "user:bob")
+	g.AddRelation("user:bob", "user:mary")
+
+	engine := NewPolicyEngine(store, g)
+	dec := engine.Evaluate("alice", "file1", "read", nil)
+	if !dec.Allow || dec.Delegator != "mary" {
+		t.Fatalf("expected delegation to allow via mary, got %#v", dec)
+	}
+}
+
+func TestEvaluateDelegationChainInvalid(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["admin"] = Role{Name: "admin", Policies: []string{"p1"}}
+	store.Users["mary"] = User{Username: "mary"} // no roles
+	store.Users["alice"] = User{Username: "alice"}
+	store.Policies["p1"] = Policy{
+		ID:       "p1",
+		Subjects: []Subject{{Role: "admin"}},
+		Resource: []string{"file1"},
+		Action:   []string{"read"},
+		Effect:   "allow",
+	}
+	g := graph.New()
+	g.AddRelation("user:alice", "user:mary")
+
+	engine := NewPolicyEngine(store, g)
+	dec := engine.Evaluate("alice", "file1", "read", nil)
+	if dec.Allow {
+		t.Fatalf("expected delegation chain to deny access, got %#v", dec)
+	}
+}

@@ -196,7 +196,46 @@ relationships form a directed graph that the evaluator expands when checking acc
 ```
 policyctl graph add user:alice group:managers
 policyctl graph add group:managers resource:server1
+policyctl graph delegate alice mary
 policyctl graph list
+```
+
+### Delegation
+
+The relationship graph also supports user-to-user delegation. When a user delegates to another,
+the delegate can act on behalf of the delegator through a chain of delegation edges.
+
+```sh
+# allow alice to act as mary
+policyctl graph delegate alice mary
+```
+
+When `alice` makes a request the evaluator will consider `mary`'s policies if `alice` does not
+have direct access. The resulting decision includes the `delegator` field indicating which user
+granted the effective permission.
+
+**Sample request via delegation:**
+
+```sh
+curl -X POST http://localhost:8080/check-access \
+    -H "Content-Type: application/json" \
+    -d '{"tenantID":"default","subject":"alice","resource":"file1","action":"read"}'
+```
+
+**Sample response:**
+
+```json
+{
+  "allow": true,
+  "policy_id": "policy1",
+  "reason": "allowed by policy",
+  "delegator": "mary",
+  "context": {
+    "subject": "alice",
+    "resource": "file1",
+    "action": "read"
+  }
+}
 ```
 
 #### Sample policy
