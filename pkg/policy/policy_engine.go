@@ -60,7 +60,8 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 					if (polResource == "*" || polResource == resource) &&
 						(polAction == "*" || polAction == action) {
 						ok := evaluateConditions(policy.Conditions, env)
-						if !ok {
+
+						if ok := evaluateConditions(policy.Conditions, env); !ok {
 							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
 						}
 						switch policy.Effect {
