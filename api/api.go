@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
+	"github.com/bradtumy/authorization-service/pkg/store"
+	"github.com/bradtumy/authorization-service/pkg/tenant"
 	"github.com/bradtumy/authorization-service/pkg/validator"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -21,7 +24,7 @@ var (
 	policyEngines map[string]*policy.PolicyEngine
 	policyGraphs  map[string]*graph.Graph
 	policyFiles   map[string]string
-	tenants       map[string]Tenant
+	backend       store.Store
 	compiler      policycompiler.Compiler
 )
 
@@ -34,7 +37,12 @@ func init() {
 	policyEngines = make(map[string]*policy.PolicyEngine)
 	policyGraphs = make(map[string]*graph.Graph)
 	policyFiles = make(map[string]string)
-	tenants = make(map[string]Tenant)
+
+	var err error
+	backend, err = store.New()
+	if err != nil {
+		panic("failed to init store: " + err.Error())
+	}
 
 	defaultTenant := "default"
 	defaultFile := os.Getenv("POLICY_FILE")
@@ -51,7 +59,10 @@ func init() {
 	policyGraphs[defaultTenant] = g
 	policyEngines[defaultTenant] = policy.NewPolicyEngine(store, g)
 	policyFiles[defaultTenant] = defaultFile
-	tenants[defaultTenant] = Tenant{ID: defaultTenant, Name: "default", CreatedAt: time.Now()}
+	def := Tenant{ID: defaultTenant, Name: "default", CreatedAt: time.Now()}
+	if err := backend.SaveTenant(context.Background(), def); err != nil {
+		panic("failed to save default tenant: " + err.Error())
+	}
 
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
 }
@@ -78,11 +89,7 @@ type CreateTenantRequest struct {
 	Name     string `json:"name"`
 }
 
-type Tenant struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"createdAt"`
-}
+type Tenant = tenant.Tenant
 
 type ValidatePolicyRequest struct {
 	TenantID string `json:"tenantID"`
@@ -201,7 +208,7 @@ func CreateTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "tenantID is required", http.StatusBadRequest)
 		return
 	}
-	if _, exists := tenants[req.TenantID]; exists {
+	if _, err := backend.LoadTenant(r.Context(), req.TenantID); err == nil {
 		http.Error(w, "tenant already exists", http.StatusConflict)
 		return
 	}
@@ -212,7 +219,10 @@ func CreateTenant(w http.ResponseWriter, r *http.Request) {
 	policyEngines[req.TenantID] = policy.NewPolicyEngine(store, g)
 	policyFiles[req.TenantID] = ""
 	tenant := Tenant{ID: req.TenantID, Name: req.Name, CreatedAt: time.Now()}
-	tenants[req.TenantID] = tenant
+	if err := backend.SaveTenant(r.Context(), tenant); err != nil {
+		http.Error(w, "failed to save tenant", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tenant)
 }
@@ -224,8 +234,8 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	tenant, ok := tenants[req.TenantID]
-	if !ok {
+	tenant, err := backend.LoadTenant(r.Context(), req.TenantID)
+	if err != nil {
 		http.Error(w, "tenant not found", http.StatusNotFound)
 		return
 	}
@@ -233,16 +243,17 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 	delete(policyGraphs, req.TenantID)
 	delete(policyEngines, req.TenantID)
 	delete(policyFiles, req.TenantID)
-	delete(tenants, req.TenantID)
+	backend.DeleteTenant(r.Context(), req.TenantID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tenant)
 }
 
 // ListTenants returns all registered tenants.
 func ListTenants(w http.ResponseWriter, r *http.Request) {
-	list := make([]Tenant, 0, len(tenants))
-	for _, t := range tenants {
-		list = append(list, t)
+	list, err := backend.ListTenants(r.Context())
+	if err != nil {
+		http.Error(w, "failed to list tenants", http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)

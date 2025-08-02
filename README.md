@@ -25,6 +25,7 @@ Authorization Service is an open-source authorization service that reads policie
    CLIENT_SECRET=my-client-secret
    JWT_SECRET=my-jwt-secret
    PORT=8080
+   STORE_BACKEND=memory # or sqlite
    ```
 
 ### Usage
@@ -346,8 +347,31 @@ To develop and test the service, follow these steps:
 2. Run tests:
 
    ```sh
-   go test ./...
+   POLICY_FILE=../configs/policies.yaml JWT_SECRET=secret go test ./...
    ```
+
+### Persistence Backends
+
+The service stores tenants and policies using a pluggable backend. The backend is
+selected with the `STORE_BACKEND` environment variable:
+
+* `memory` (default) – stores all data in memory.
+* `sqlite` – persists data in a SQLite database using `STORE_SQLITE_DSN` for the
+  connection string (defaults to `file:authorization.db?_foreign_keys=on`).
+
+When using SQLite, run the provided migration to create the required tables:
+
+```sh
+sqlite3 authorization.db < migrations/001_init.sql
+```
+
+Developers can run the service with SQLite by setting:
+
+```sh
+export STORE_BACKEND=sqlite
+export STORE_SQLITE_DSN=authorization.db
+go run cmd/main.go
+```
 
 ### Docker Deployment
 

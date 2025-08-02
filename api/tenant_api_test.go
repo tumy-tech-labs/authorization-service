@@ -94,7 +94,7 @@ func TestDeleteTenant(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", w.Code)
 	}
-	if _, ok := tenants[id]; ok {
+	if _, err := backend.LoadTenant(r.Context(), id); err == nil {
 		t.Fatalf("tenant not deleted")
 	}
 }
