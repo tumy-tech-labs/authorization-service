@@ -5,8 +5,8 @@
 **Request:**
 
 ```json
-
 {
+  "tenantID": "default",
   "subject": "user1",
   "resource": "file1",
   "action": "read",

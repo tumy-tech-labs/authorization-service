@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -16,10 +15,10 @@ import (
 )
 
 var (
-	policyEngine *policy.PolicyEngine
-	policyStore  *policy.PolicyStore
-	policyFile   = "configs/policies.yaml"
-	compiler     policycompiler.Compiler
+	policyStores  map[string]*policy.PolicyStore
+	policyEngines map[string]*policy.PolicyEngine
+	policyFiles   map[string]string
+	compiler      policycompiler.Compiler
 )
 
 func init() {
@@ -27,15 +26,29 @@ func init() {
 		log.Printf("warning: could not load .env file: %v", err)
 	}
 
-	policyStore = policy.NewPolicyStore()
-	if err := policyStore.LoadPolicies(policyFile); err != nil {
+	policyStores = make(map[string]*policy.PolicyStore)
+	policyEngines = make(map[string]*policy.PolicyEngine)
+	policyFiles = make(map[string]string)
+
+	defaultTenant := "default"
+	defaultFile := os.Getenv("POLICY_FILE")
+	if defaultFile == "" {
+		defaultFile = "configs/policies.yaml"
+	}
+
+	store := policy.NewPolicyStore()
+	if err := store.LoadPolicies(defaultFile); err != nil {
 		panic("Failed to load policies: " + err.Error())
 	}
-	policyEngine = policy.NewPolicyEngine(policyStore)
+	policyStores[defaultTenant] = store
+	policyEngines[defaultTenant] = policy.NewPolicyEngine(store)
+	policyFiles[defaultTenant] = defaultFile
+
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
 }
 
 type AccessRequest struct {
+	TenantID   string            `json:"tenantID"`
 	Subject    string            `json:"subject"`
 	Resource   string            `json:"resource"`
 	Action     string            `json:"action"`
@@ -43,7 +56,17 @@ type AccessRequest struct {
 }
 
 type CompileRequest struct {
-	Rule string `json:"rule"`
+	TenantID string `json:"tenantID"`
+	Rule     string `json:"rule"`
+}
+
+type TenantRequest struct {
+	TenantID string `json:"tenantID"`
+}
+
+type ValidatePolicyRequest struct {
+	TenantID string `json:"tenantID"`
+	Policy   string `json:"policy"`
 }
 
 func SetupRouter() *mux.Router {
@@ -64,9 +87,14 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	engine, ok := policyEngines[req.TenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
 
 	// Evaluate permissions using the PolicyEngine
-	decision := policyEngine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
+	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
 
 	// Respond with the authorization decision
 	w.Header().Set("Content-Type", "application/json")
@@ -75,7 +103,22 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 
 // ReloadPolicies reloads policies from the YAML file.
 func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
-	if err := policyStore.LoadPolicies(policyFile); err != nil {
+	var req TenantRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	store, ok := policyStores[req.TenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	file, ok := policyFiles[req.TenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	if err := store.LoadPolicies(file); err != nil {
 		log.Printf("policy reload failed: %v", err)
 		http.Error(w, "failed to reload policies", http.StatusInternalServerError)
 		return
@@ -92,6 +135,10 @@ func CompileRule(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	if _, ok := policyStores[req.TenantID]; !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
 	policy, err := compiler.Compile(req.Rule)
 	if err != nil {
 		http.Error(w, "failed to compile rule: "+err.Error(), http.StatusInternalServerError)
@@ -103,12 +150,16 @@ func CompileRule(w http.ResponseWriter, r *http.Request) {
 
 // ValidatePolicy validates a policy definition provided in the request body.
 func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
-	data, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "failed to read body: "+err.Error(), http.StatusBadRequest)
+	var req ValidatePolicyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := validator.ValidatePolicyData(data); err != nil {
+	if _, ok := policyStores[req.TenantID]; !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	if err := validator.ValidatePolicyData([]byte(req.Policy)); err != nil {
 		http.Error(w, "invalid policy: "+err.Error(), http.StatusBadRequest)
 		return
 	}
