@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -24,15 +23,12 @@ var (
 )
 
 func init() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		fmt.Println("Error loading .env file:", err)
-		panic("Failed to load .env file")
+	if err := godotenv.Load(".env"); err != nil {
+		log.Printf("warning: could not load .env file: %v", err)
 	}
 
 	policyStore = policy.NewPolicyStore()
-	err = policyStore.LoadPolicies(policyFile)
-	if err != nil {
+	if err := policyStore.LoadPolicies(policyFile); err != nil {
 		panic("Failed to load policies: " + err.Error())
 	}
 	policyEngine = policy.NewPolicyEngine(policyStore)

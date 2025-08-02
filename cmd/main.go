@@ -10,10 +10,9 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	// Load environment variables from .env file if present
+	if err := godotenv.Load(".env"); err != nil {
+		log.Printf("warning: could not load .env file: %v", err)
 	}
 
 	// Get the port from the environment variable
