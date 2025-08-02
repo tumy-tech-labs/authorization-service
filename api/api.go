@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/bradtumy/authorization-service/internal/logger"
 	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
@@ -17,6 +18,10 @@ import (
 	"github.com/bradtumy/authorization-service/pkg/validator"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -26,6 +31,15 @@ var (
 	policyFiles   map[string]string
 	backend       store.Store
 	compiler      policycompiler.Compiler
+	auditLogger   *logger.Logger
+	policyEval    = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "policy_eval_count",
+			Help: "Number of policy evaluations",
+		},
+		[]string{"decision"},
+	)
+	tracer trace.Tracer
 )
 
 func init() {
@@ -65,6 +79,10 @@ func init() {
 	}
 
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
+	lvl := logger.ParseLevel(os.Getenv("LOG_LEVEL"))
+	auditLogger = logger.New(os.Stdout, lvl)
+	prometheus.MustRegister(policyEval)
+	tracer = otel.Tracer("authorization-service")
 }
 
 type AccessRequest struct {
@@ -98,6 +116,8 @@ type ValidatePolicyRequest struct {
 
 func SetupRouter() *mux.Router {
 	router := mux.NewRouter()
+	router.Use(middleware.CorrelationMiddleware)
+	router.Use(middleware.MetricsMiddleware)
 	router.Use(middleware.JWTMiddleware)
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
@@ -106,10 +126,13 @@ func SetupRouter() *mux.Router {
 	router.HandleFunc("/tenant/create", CreateTenant).Methods("POST")
 	router.HandleFunc("/tenant/delete", DeleteTenant).Methods("POST")
 	router.HandleFunc("/tenant/list", ListTenants).Methods("GET")
+	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
 	return router
 }
 
 func CheckAccess(w http.ResponseWriter, r *http.Request) {
+	ctx, span := tracer.Start(r.Context(), "CheckAccess")
+	defer span.End()
 	// Extract access request details from the request body
 	var req AccessRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -124,7 +147,28 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Evaluate permissions using the PolicyEngine
+	_, evalSpan := tracer.Start(ctx, "PolicyEvaluation")
 	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
+	evalSpan.End()
+
+	// Audit log
+	cid := middleware.CorrelationIDFromContext(r.Context())
+	status := "deny"
+	if decision.Allow {
+		status = "allow"
+	}
+	policyEval.WithLabelValues(status).Inc()
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: cid,
+		TenantID:      req.TenantID,
+		Subject:       req.Subject,
+		Action:        req.Action,
+		Resource:      req.Resource,
+		Decision:      status,
+		PolicyID:      decision.PolicyID,
+		Reason:        decision.Reason,
+	})
 
 	// Respond with the authorization decision
 	w.Header().Set("Content-Type", "application/json")
@@ -133,6 +177,8 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 
 // ReloadPolicies reloads policies from the YAML file.
 func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "ReloadPolicies")
+	defer span.End()
 	var req TenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
@@ -149,17 +195,33 @@ func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := store.LoadPolicies(file); err != nil {
-		log.Printf("policy reload failed: %v", err)
+		auditLogger.Log(logger.Entry{
+			Level:         "error",
+			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+			TenantID:      req.TenantID,
+			Action:        "reload",
+			Resource:      file,
+			Reason:        err.Error(),
+		})
 		http.Error(w, "failed to reload policies", http.StatusInternalServerError)
 		return
 	}
-	log.Print("policy reload successful")
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		TenantID:      req.TenantID,
+		Action:        "reload",
+		Resource:      file,
+		Decision:      "success",
+	})
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("policies reloaded"))
 }
 
 // CompileRule compiles a natural language rule into a YAML policy.
 func CompileRule(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "CompileRule")
+	defer span.End()
 	var req CompileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
@@ -171,15 +233,31 @@ func CompileRule(w http.ResponseWriter, r *http.Request) {
 	}
 	policy, err := compiler.Compile(req.Rule)
 	if err != nil {
+		auditLogger.Log(logger.Entry{
+			Level:         "error",
+			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+			TenantID:      req.TenantID,
+			Action:        "compile",
+			Reason:        err.Error(),
+		})
 		http.Error(w, "failed to compile rule: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		TenantID:      req.TenantID,
+		Action:        "compile",
+		Decision:      "success",
+	})
 	w.Header().Set("Content-Type", "application/x-yaml")
 	w.Write([]byte(policy))
 }
 
 // ValidatePolicy validates a policy definition provided in the request body.
 func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "ValidatePolicy")
+	defer span.End()
 	var req ValidatePolicyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
@@ -190,15 +268,31 @@ func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validator.ValidatePolicyData([]byte(req.Policy)); err != nil {
+		auditLogger.Log(logger.Entry{
+			Level:         "warn",
+			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+			TenantID:      req.TenantID,
+			Action:        "validate",
+			Reason:        err.Error(),
+		})
 		http.Error(w, "invalid policy: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		TenantID:      req.TenantID,
+		Action:        "validate",
+		Decision:      "success",
+	})
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("policy is valid"))
 }
 
 // CreateTenant registers a new tenant with an empty PolicyStore.
 func CreateTenant(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "CreateTenant")
+	defer span.End()
 	var req CreateTenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
@@ -223,12 +317,21 @@ func CreateTenant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save tenant", http.StatusInternalServerError)
 		return
 	}
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		TenantID:      req.TenantID,
+		Action:        "tenant_create",
+		Decision:      "success",
+	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tenant)
 }
 
 // DeleteTenant removes a tenant and associated policy data.
 func DeleteTenant(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "DeleteTenant")
+	defer span.End()
 	var req TenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
@@ -244,6 +347,13 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 	delete(policyEngines, req.TenantID)
 	delete(policyFiles, req.TenantID)
 	backend.DeleteTenant(r.Context(), req.TenantID)
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		TenantID:      req.TenantID,
+		Action:        "tenant_delete",
+		Decision:      "success",
+	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tenant)
 }

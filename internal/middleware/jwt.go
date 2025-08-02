@@ -1,24 +1,36 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
+	oidc "github.com/coreos/go-oidc"
 	"github.com/joho/godotenv"
 )
 
-var jwtSecret []byte
+var (
+	verifier *oidc.IDTokenVerifier
+)
 
 func init() {
 	godotenv.Load()
-	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-	if len(jwtSecret) == 0 {
-		panic("JWT_SECRET is not set in the environment")
+	issuer := os.Getenv("OIDC_ISSUER")
+	audience := os.Getenv("OIDC_AUDIENCE")
+	if issuer == "" {
+		return
 	}
+	ctx := context.Background()
+	provider, err := oidc.NewProvider(ctx, issuer)
+	if err != nil {
+		panic("failed to create OIDC provider: " + err.Error())
+	}
+	cfg := &oidc.Config{ClientID: audience}
+	verifier = provider.Verifier(cfg)
 }
 
+// JWTMiddleware validates ID tokens using OIDC and JWKS.
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -26,20 +38,24 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			http.Error(w, "Missing token", http.StatusUnauthorized)
 			return
 		}
-
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, http.ErrAbortHandler
+		if verifier != nil {
+			ctx := r.Context()
+			idToken, err := verifier.Verify(ctx, tokenString)
+			if err != nil {
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
 			}
-			return jwtSecret, nil
-		})
-
-		if err != nil || !token.Valid {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
+			var claims struct {
+				Subject string `json:"sub"`
+			}
+			if err := idToken.Claims(&claims); err != nil {
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
+			}
+			ctx = context.WithValue(ctx, "subject", claims.Subject)
+			r = r.WithContext(ctx)
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }
