@@ -10,8 +10,9 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file if present
-	if err := godotenv.Load(".env"); err != nil {
+	// Load environment variables from .env file if present.
+	// Missing files are ignored to avoid noisy startup warnings.
+	if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
 		log.Printf("warning: could not load .env file: %v", err)
 	}
 
