@@ -26,6 +26,8 @@ Authorization Service is an open-source authorization service that reads policie
    JWT_SECRET=my-jwt-secret
    PORT=8080
    STORE_BACKEND=memory # or sqlite
+   OIDC_ISSUER=https://issuer.example.com
+   OIDC_AUDIENCE=my-client-id
    ```
 
 ### Usage
@@ -42,6 +44,46 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 | POST   | `/tenant/create`| Register a new tenant                            |
 | POST   | `/tenant/delete`| Remove an existing tenant                        |
 | GET    | `/tenant/list`  | List all tenants                                |
+
+### Observability
+
+The service emits structured JSON logs for every request. Each log entry contains a
+`correlation_id` so individual requests can be traced across components. Example:
+
+```json
+{
+  "timestamp": "2024-01-01T00:00:00Z",
+  "level": "info",
+  "correlation_id": "123e4567-e89b-12d3-a456-426614174000",
+  "tenant_id": "default",
+  "subject": "user1",
+  "action": "read",
+  "resource": "file1",
+  "decision": "allow",
+  "policy_id": "policy1",
+  "reason": "matched rule"
+}
+```
+
+Prometheus metrics and OpenTelemetry traces are also exposed. To scrape metrics, point
+Prometheus at the `/metrics` endpoint. Traces can be exported by configuring the standard
+`OTEL_EXPORTER_OTLP_ENDPOINT` environment variable.
+
+Set `LOG_LEVEL=debug` in the environment to enable verbose logging; the default level is
+`info`.
+
+### OIDC Configuration
+
+Tokens presented to the service are validated using an OpenID Connect issuer. Configure
+`OIDC_ISSUER` and `OIDC_AUDIENCE` in `.env` to enable JWKS validation. Example with
+Keycloak:
+
+```
+OIDC_ISSUER=http://localhost:8080/realms/master
+OIDC_AUDIENCE=account
+```
+
+The middleware will automatically fetch and cache the JWKS for signature verification.
 
 #### Generate JWT
 
