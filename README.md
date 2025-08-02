@@ -29,6 +29,14 @@ Authorization Service is an open-source authorization service that reads policie
 
 ### Usage
 
+#### API Endpoints
+
+| Method | Endpoint       | Description                     |
+|--------|----------------|---------------------------------|
+| POST   | `/check-access`| Evaluate an access request      |
+| POST   | `/reload`      | Reload policies from disk       |
+| POST   | `/compile`     | Convert natural language to YAML |
+
 #### Generate JWT
 
 To generate a client credential JWT token:
@@ -71,7 +79,7 @@ Use the generated JWT token to request a policy decision from the authorization 
             "subject": "user1", 
             "resource": "file1",
             "action": "read",
-            "conditions": []
+            "conditions": {}
         }'
     ```
 
@@ -79,13 +87,46 @@ Use the generated JWT token to request a policy decision from the authorization 
 
     ```json
     {
-        "allowed": true
+        "allow": true,
+        "policy_id": "policy1",
+        "reason": "allowed by policy",
+        "context": {
+            "subject": "user1",
+            "resource": "file1",
+            "action": "read"
+        }
     }
     ```
 
 #### Modifying Policies
 
 To modify the policies, edit the `policies.yaml` file located in the `configs` directory.
+After saving your changes, trigger a reload without restarting the service:
+
+```sh
+curl -X POST http://localhost:8080/reload \
+    -H "Authorization: Bearer <JWT>"
+```
+
+On success the service logs a message indicating that policies were reloaded.
+
+#### Compile Natural Language Policy
+
+You can convert an English rule into a YAML policy using either the HTTP API or the CLI.
+
+**API example:**
+
+```sh
+curl -X POST http://localhost:8080/compile \
+    -H "Content-Type: application/json" \
+    -d '{"rule": "Mary can approve invoices"}'
+```
+
+**CLI example:**
+
+```sh
+go run cmd/policyctl/main.go compile "Mary can approve invoices"
+```
 
 #### Example `policies.yaml`
 
@@ -134,9 +175,7 @@ policies:
 
 #### Adding a New Policy
 
-Open the configs/policies.yaml file.
-
-Add a new policy to the file. For example, to allow user3 to write to file3:
+Open the configs/policies.yaml file and add a new policy. For example, to allow user3 to write to file3:
 
 ```yaml
 policies:
@@ -151,10 +190,11 @@ policies:
     effect: "allow"
 ```
 
-Save the file and restart the authorization service to apply the changes:
+Save the file and call the `/reload` endpoint to apply the changes:
 
-```bash
-go run cmd/main.go
+```sh
+curl -X POST http://localhost:8080/reload \
+    -H "Authorization: Bearer <JWT>"
 ```
 
 ### Development
@@ -175,19 +215,30 @@ To develop and test the service, follow these steps:
 
 ### Docker Deployment
 
-To build and run the service using Docker:
+The project ships with a `Dockerfile` and a `docker-compose.yml` for running the
+service in a containerized environment.
 
-1. Build the Docker image:
-
-    ```sh
-    docker build -t authorization-service .
-    ```
-
-2. Run the Docker container:
+1. Create a `.env` file in the project root with the required variables
+   (`CLIENT_ID`, `CLIENT_SECRET`, `JWT_SECRET`, `PORT`).
+2. Start the service:
 
     ```sh
-    docker run -d -p 8080:8080 --env-file .env authorization-service
+    docker compose up --build
     ```
+
+3. Stop the service:
+
+    ```sh
+    docker compose down
+    ```
+
+For convenience, a `Makefile` is provided:
+
+```sh
+make up     # Start services using docker compose
+make down   # Stop services
+make test   # Run unit tests
+```
 
 ### Contributing
 

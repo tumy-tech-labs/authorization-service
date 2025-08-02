@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"gopkg.in/yaml.v2"
+
+	"github.com/bradtumy/authorization-service/pkg/validator"
 )
 
 // PolicyStore represents a store for policies, roles, and users.
@@ -25,12 +27,14 @@ func NewPolicyStore() *PolicyStore {
 }
 
 // LoadPolicies loads policies, roles, and users from the specified file.
+// The configuration is validated before being swapped into the store.
 func (ps *PolicyStore) LoadPolicies(filePath string) error {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
+		return err
+	}
+
+	if err = validator.ValidatePolicyData(data); err != nil {
 		return err
 	}
 
@@ -40,20 +44,29 @@ func (ps *PolicyStore) LoadPolicies(filePath string) error {
 		Policies []Policy `yaml:"policies"`
 	}
 
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
+	if err = yaml.UnmarshalStrict(data, &config); err != nil {
 		return err
 	}
 
+	newRoles := make(map[string]Role)
+	newUsers := make(map[string]User)
+	newPolicies := make(map[string]Policy)
+
 	for _, role := range config.Roles {
-		ps.Roles[role.Name] = role
+		newRoles[role.Name] = role
 	}
 	for _, user := range config.Users {
-		ps.Users[user.Username] = user
+		newUsers[user.Username] = user
 	}
 	for _, policy := range config.Policies {
-		ps.Policies[policy.ID] = policy
+		newPolicies[policy.ID] = policy
 	}
+
+	ps.mu.Lock()
+	ps.Roles = newRoles
+	ps.Users = newUsers
+	ps.Policies = newPolicies
+	ps.mu.Unlock()
 
 	return nil
 }

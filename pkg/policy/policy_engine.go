@@ -1,8 +1,11 @@
 package policy
 
-import "fmt"
-
-// PolicyEngine represents an engine for policy evaluation.
+// PolicyEngine evaluates policies to determine access decisions.
+//
+// The engine performs simple matching on resource and action attributes. Policies
+// may optionally scope themselves to specific roles via the `Subjects` field.
+// Evaluation stops at the first matching policy and returns a structured
+// decision describing the result.
 type PolicyEngine struct {
 	store *PolicyStore
 }
@@ -12,40 +15,58 @@ func NewPolicyEngine(store *PolicyStore) *PolicyEngine {
 	return &PolicyEngine{store: store}
 }
 
-// Evaluate evaluates the permission for the given subject, resource, action, and conditions.
-func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []string) bool {
+// Evaluate determines whether the given subject is allowed to perform the
+// specified action on the resource. It returns a Decision describing the
+// outcome and does not log sensitive data.
+func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[string]string) Decision {
+	ctx := map[string]string{
+		"subject":  subject,
+		"resource": resource,
+		"action":   action,
+	}
+
 	user, exists := pe.store.Users[subject]
-	fmt.Println("::Policy Engine: Subject:", subject)
-	fmt.Println("::Policy Engine: Subject:", user, exists)
 	if !exists {
-		return false // User not found
+		return Decision{Allow: false, Reason: "user not found", Context: ctx}
 	}
 
 	for _, roleName := range user.Roles {
 		role, exists := pe.store.Roles[roleName]
-		fmt.Println("::Policy Engine: Roles", role, exists)
 		if !exists {
 			continue
 		}
 
 		for _, policyID := range role.Policies {
 			policy, exists := pe.store.Policies[policyID]
-			fmt.Println("::Policy Engine: Policy", policy, exists)
 			if !exists {
 				continue
 			}
-			// debug statements
-			fmt.Println("Resources: ", resource)
-			fmt.Println("Action: ", action)
-			fmt.Println("Policy: ", policy)
-			fmt.Println("Policy Resource: ", policy.Resource)
-			fmt.Println("Policy Action: ", policy.Action)
+			// Ensure the policy applies to the current role
+			if len(policy.Subjects) > 0 {
+				allowed := false
+				for _, subj := range policy.Subjects {
+					if subj.Role == roleName {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					continue
+				}
+			}
 
 			for _, polResource := range policy.Resource {
 				for _, polAction := range policy.Action {
-					if polResource == "*" || polResource == resource {
-						if polAction == "*" || polAction == action {
-							return policy.Effect == "allow"
+					if (polResource == "*" || polResource == resource) &&
+						(polAction == "*" || polAction == action) {
+						if ok := evaluateConditions(policy.Conditions, env); !ok {
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
+						}
+						switch policy.Effect {
+						case "allow":
+							return Decision{Allow: true, PolicyID: policy.ID, Reason: "allowed by policy", Context: ctx}
+						case "deny":
+							return Decision{Allow: false, PolicyID: policy.ID, Reason: "denied by policy", Context: ctx}
 						}
 					}
 				}
@@ -53,5 +74,5 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, conditions []
 		}
 	}
 
-	return false // No matching policy found
+	return Decision{Allow: false, Reason: "no matching policy", Context: ctx}
 }
