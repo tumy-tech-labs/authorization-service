@@ -186,6 +186,34 @@ curl -X POST http://localhost:8080/compile \
 go run cmd/policyctl/main.go compile "Mary can approve invoices"
 ```
 
+### Graph Relationships
+
+The authorization service can map relationships between users, groups, and resources. These
+relationships form a directed graph that the evaluator expands when checking access.
+
+#### CLI examples
+
+```
+policyctl graph add user:alice group:managers
+policyctl graph add group:managers resource:server1
+policyctl graph list
+```
+
+#### Sample policy
+
+```
+policies:
+  - id: "manager-read"
+    description: "Managers can read server1"
+    subjects:
+      - role: "managers"
+    resource:
+      - "server1"
+    action:
+      - "read"
+    effect: "allow"
+```
+
 #### Example `policies.yaml`
 
 ```yaml

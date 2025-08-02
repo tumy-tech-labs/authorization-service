@@ -1,6 +1,10 @@
 package policy
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/bradtumy/authorization-service/pkg/graph"
+)
 
 func TestEvaluateSubjectMismatch(t *testing.T) {
 	store := NewPolicyStore()
@@ -17,7 +21,7 @@ func TestEvaluateSubjectMismatch(t *testing.T) {
 		Effect:   "allow",
 	}
 
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 	decision := engine.Evaluate("user1", "file1", "read", nil)
 	if decision.Allow {
 		t.Fatalf("expected evaluation to fail due to subject mismatch")
@@ -36,7 +40,7 @@ func TestEvaluateAllow(t *testing.T) {
 		Effect:   "allow",
 	}
 
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 	decision := engine.Evaluate("user1", "file1", "read", nil)
 	if !decision.Allow {
 		t.Fatalf("expected evaluation to allow access, got %v", decision)
@@ -58,7 +62,7 @@ func TestEvaluateDeny(t *testing.T) {
 		Effect:   "deny",
 	}
 
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 	decision := engine.Evaluate("user1", "file1", "read", nil)
 	if decision.Allow {
 		t.Fatalf("expected evaluation to deny access, got %v", decision)
@@ -80,7 +84,7 @@ func TestEvaluateWildcard(t *testing.T) {
 		Effect:   "allow",
 	}
 
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 	decision := engine.Evaluate("user1", "anyfile", "write", nil)
 	if !decision.Allow {
 		t.Fatalf("expected wildcard policy to allow access, got %v", decision)
@@ -100,7 +104,7 @@ func TestEvaluateConditionSatisfied(t *testing.T) {
 		Conditions: map[string]string{"time": "business-hours"},
 	}
 
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 	decision := engine.Evaluate("user1", "file1", "read", map[string]string{"time": "10:00"})
 	if !decision.Allow {
 		t.Fatalf("expected access to be allowed during business hours")
@@ -120,12 +124,54 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 		Conditions: map[string]string{"time": "business-hours"},
 	}
 
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 	decision := engine.Evaluate("user1", "file1", "read", map[string]string{"time": "20:00"})
 	if decision.Allow {
 		t.Fatalf("expected access to be denied outside business hours")
 	}
 	if decision.Reason != "conditions not satisfied" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
+	}
+}
+
+func TestEvaluateGroupMembership(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["managers"] = Role{Name: "managers", Policies: []string{"p1"}}
+	store.Users["alice"] = User{Username: "alice"}
+	store.Policies["p1"] = Policy{
+		ID:       "p1",
+		Subjects: []Subject{{Role: "managers"}},
+		Resource: []string{"file1"},
+		Action:   []string{"read"},
+		Effect:   "allow",
+	}
+	g := graph.New()
+	g.AddRelation("user:alice", "group:managers")
+
+	engine := NewPolicyEngine(store, g)
+	dec := engine.Evaluate("alice", "file1", "read", nil)
+	if !dec.Allow {
+		t.Fatalf("expected group membership to allow access")
+	}
+}
+
+func TestEvaluateResourceGroup(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["admin"] = Role{Name: "admin", Policies: []string{"p1"}}
+	store.Users["alice"] = User{Username: "alice", Roles: []string{"admin"}}
+	store.Policies["p1"] = Policy{
+		ID:       "p1",
+		Subjects: []Subject{{Role: "admin"}},
+		Resource: []string{"teamA"},
+		Action:   []string{"read"},
+		Effect:   "allow",
+	}
+	g := graph.New()
+	g.AddRelation("group:teamA", "resource:file1")
+
+	engine := NewPolicyEngine(store, g)
+	dec := engine.Evaluate("alice", "file1", "read", nil)
+	if !dec.Allow {
+		t.Fatalf("expected resource group expansion to allow access")
 	}
 }

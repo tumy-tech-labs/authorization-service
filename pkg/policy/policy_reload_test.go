@@ -3,6 +3,8 @@ package policy
 import (
 	"os"
 	"testing"
+
+	"github.com/bradtumy/authorization-service/pkg/graph"
 )
 
 // Test that policies can be reloaded from file without restarting service.
@@ -41,7 +43,7 @@ policies:
 	if err := store.LoadPolicies(tmp.Name()); err != nil {
 		t.Fatalf("load policies: %v", err)
 	}
-	engine := NewPolicyEngine(store)
+	engine := NewPolicyEngine(store, graph.New())
 
 	dec := engine.Evaluate("alice", "file1", "read", nil)
 	if dec.Allow {
