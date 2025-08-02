@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 class AuthorizationSDK {
   constructor() {
@@ -13,21 +13,23 @@ class AuthorizationSDK {
       // Add any other necessary claims
     };
 
-    const token = jwt.sign(payload, this.clientSecret, { expiresIn: '1d' });
+    const token = jwt.sign(payload, this.clientSecret, { expiresIn: "1d" });
     return token;
   }
 
-  async evaluatePolicy(subject, resource, action, conditions) {
+  async evaluatePolicy(tenantID, subject, resource, action, conditions) {
     const token = this.generateToken();
 
     // Implement logic to send policy evaluation request
     // Example: use axios or fetch to make an HTTP request to your authorization service
     // Ensure to include the generated token in the request headers
     // Example:
-    // const response = await axios.post('https://your-auth-service/check-access', { subject, resource, action, conditions }, { headers: { Authorization: `Bearer ${token}` } });
+    // const response = await axios.post('https://your-auth-service/check-access', { tenantID, subject, resource, action, conditions }, { headers: { Authorization: `Bearer ${token}` } });
 
     // For simplicity, this example just logs the request details
-    console.log(`Policy Evaluation Request: Subject=${subject}, Resource=${resource}, Action=${action}, Conditions=${conditions}`);
+    console.log(
+      `Policy Evaluation Request: Tenant=${tenantID}, Subject=${subject}, Resource=${resource}, Action=${action}, Conditions=${conditions}`,
+    );
   }
 }
 
