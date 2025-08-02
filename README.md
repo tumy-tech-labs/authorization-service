@@ -155,6 +155,34 @@ policyctl tenant list
 policyctl tenant delete acme
 ```
 
+### Quickstart: Multi-Tenant Example
+
+Run two isolated tenants locally.
+
+#### Using Docker
+
+```sh
+docker compose up -d
+export POLICYCTL_TOKEN=<JWT>
+policyctl tenant create acme
+policyctl tenant create globex
+curl -H "Authorization: Bearer $POLICYCTL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"tenantID":"acme","subject":"alice","resource":"file1","action":"read"}' \
+  http://localhost:8080/check-access
+curl -H "Authorization: Bearer $POLICYCTL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"tenantID":"globex","subject":"alice","resource":"file1","action":"read"}' \
+  http://localhost:8080/check-access
+```
+
+#### Using the CLI
+
+```sh
+go run cmd/main.go &
+export POLICYCTL_TOKEN=<JWT>
+policyctl tenant create acme
+policyctl tenant create globex
+```
+
 #### Modifying Policies
 
 To modify the policies, edit the `policies.yaml` file located in the `configs` directory.
