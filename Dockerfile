@@ -9,6 +9,7 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+COPY .env .env
 
 # Build the application binary
 RUN go build -o authorization-service ./cmd
