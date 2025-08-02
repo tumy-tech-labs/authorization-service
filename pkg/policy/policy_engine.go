@@ -1,5 +1,11 @@
 package policy
 
+import (
+	"strings"
+
+	"github.com/bradtumy/authorization-service/pkg/graph"
+)
+
 // PolicyEngine evaluates policies to determine access decisions.
 //
 // The engine performs simple matching on resource and action attributes. Policies
@@ -8,11 +14,12 @@ package policy
 // decision describing the result.
 type PolicyEngine struct {
 	store *PolicyStore
+	graph *graph.Graph
 }
 
 // NewPolicyEngine creates a new PolicyEngine instance.
-func NewPolicyEngine(store *PolicyStore) *PolicyEngine {
-	return &PolicyEngine{store: store}
+func NewPolicyEngine(store *PolicyStore, g *graph.Graph) *PolicyEngine {
+	return &PolicyEngine{store: store, graph: g}
 }
 
 // Evaluate determines whether the given subject is allowed to perform the
@@ -30,7 +37,17 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		return Decision{Allow: false, Reason: "user not found", Context: ctx}
 	}
 
-	for _, roleName := range user.Roles {
+	// Gather roles from user definition and graph-based group memberships.
+	roles := append([]string{}, user.Roles...)
+	if pe.graph != nil {
+		for _, target := range pe.graph.Targets("user:" + subject) {
+			if strings.HasPrefix(target, "group:") {
+				roles = append(roles, strings.TrimPrefix(target, "group:"))
+			}
+		}
+	}
+
+	for _, roleName := range roles {
 		role, exists := pe.store.Roles[roleName]
 		if !exists {
 			continue
@@ -56,9 +73,14 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 			}
 
 			for _, polResource := range policy.Resource {
+				matchResource := polResource == "*" || polResource == resource
+				if !matchResource && pe.graph != nil {
+					if pe.graph.HasPath("group:"+polResource, "resource:"+resource) {
+						matchResource = true
+					}
+				}
 				for _, polAction := range policy.Action {
-					if (polResource == "*" || polResource == resource) &&
-						(polAction == "*" || polAction == action) {
+					if matchResource && (polAction == "*" || polAction == action) {
 						if ok := evaluateConditions(policy.Conditions, env); !ok {
 							return Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
 						}

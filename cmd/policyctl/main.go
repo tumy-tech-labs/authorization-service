@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
 	"github.com/bradtumy/authorization-service/pkg/validator"
 )
@@ -43,8 +44,10 @@ func main() {
 		fmt.Println("policy is valid")
 	case "tenant":
 		handleTenant(os.Args[2:])
+	case "graph":
+		handleGraph(os.Args[2:])
 	default:
-		fmt.Println("usage: policyctl <compile|validate|tenant> ...")
+		fmt.Println("usage: policyctl <compile|validate|tenant|graph> ...")
 		os.Exit(1)
 	}
 }
@@ -116,4 +119,57 @@ func handleTenant(args []string) {
 		fmt.Println("usage: policyctl tenant <create|delete|list> ...")
 		os.Exit(1)
 	}
+}
+
+func handleGraph(args []string) {
+	if len(args) < 1 {
+		fmt.Println("usage: policyctl graph <add|list> ...")
+		os.Exit(1)
+	}
+	file := "graph.json"
+	g := loadGraphFile(file)
+	switch args[0] {
+	case "add":
+		if len(args) < 3 {
+			fmt.Println("usage: policyctl graph add <src> <dst>")
+			os.Exit(1)
+		}
+		g.AddRelation(args[1], args[2])
+		saveGraphFile(file, g)
+		fmt.Println("relationship added")
+	case "list":
+		rels := g.List()
+		for src, targets := range rels {
+			for _, dst := range targets {
+				fmt.Printf("%s -> %s\n", src, dst)
+			}
+		}
+	default:
+		fmt.Println("usage: policyctl graph <add|list> ...")
+		os.Exit(1)
+	}
+}
+
+func loadGraphFile(path string) *graph.Graph {
+	g := graph.New()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return g
+	}
+	var m map[string][]string
+	if err := json.Unmarshal(data, &m); err != nil {
+		return g
+	}
+	for src, targets := range m {
+		for _, dst := range targets {
+			g.AddRelation(src, dst)
+		}
+	}
+	return g
+}
+
+func saveGraphFile(path string, g *graph.Graph) {
+	m := g.List()
+	data, _ := json.MarshalIndent(m, "", "  ")
+	os.WriteFile(path, data, 0644)
 }

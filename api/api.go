@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bradtumy/authorization-service/internal/middleware"
+	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
 	"github.com/bradtumy/authorization-service/pkg/validator"
@@ -18,6 +19,7 @@ import (
 var (
 	policyStores  map[string]*policy.PolicyStore
 	policyEngines map[string]*policy.PolicyEngine
+	policyGraphs  map[string]*graph.Graph
 	policyFiles   map[string]string
 	tenants       map[string]Tenant
 	compiler      policycompiler.Compiler
@@ -30,6 +32,7 @@ func init() {
 
 	policyStores = make(map[string]*policy.PolicyStore)
 	policyEngines = make(map[string]*policy.PolicyEngine)
+	policyGraphs = make(map[string]*graph.Graph)
 	policyFiles = make(map[string]string)
 	tenants = make(map[string]Tenant)
 
@@ -43,8 +46,10 @@ func init() {
 	if err := store.LoadPolicies(defaultFile); err != nil {
 		panic("Failed to load policies: " + err.Error())
 	}
+	g := graph.New()
 	policyStores[defaultTenant] = store
-	policyEngines[defaultTenant] = policy.NewPolicyEngine(store)
+	policyGraphs[defaultTenant] = g
+	policyEngines[defaultTenant] = policy.NewPolicyEngine(store, g)
 	policyFiles[defaultTenant] = defaultFile
 	tenants[defaultTenant] = Tenant{ID: defaultTenant, Name: "default", CreatedAt: time.Now()}
 
@@ -201,8 +206,10 @@ func CreateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	store := policy.NewPolicyStore()
+	g := graph.New()
 	policyStores[req.TenantID] = store
-	policyEngines[req.TenantID] = policy.NewPolicyEngine(store)
+	policyGraphs[req.TenantID] = g
+	policyEngines[req.TenantID] = policy.NewPolicyEngine(store, g)
 	policyFiles[req.TenantID] = ""
 	tenant := Tenant{ID: req.TenantID, Name: req.Name, CreatedAt: time.Now()}
 	tenants[req.TenantID] = tenant
@@ -223,6 +230,7 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	delete(policyStores, req.TenantID)
+	delete(policyGraphs, req.TenantID)
 	delete(policyEngines, req.TenantID)
 	delete(policyFiles, req.TenantID)
 	delete(tenants, req.TenantID)

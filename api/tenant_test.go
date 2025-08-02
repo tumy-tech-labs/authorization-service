@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 )
 
@@ -87,11 +88,15 @@ policies:
 	if err := storeB.LoadPolicies(fileB.Name()); err != nil {
 		t.Fatalf("loadB: %v", err)
 	}
+	gA := graph.New()
+	gB := graph.New()
 	policyStores["tenantA"] = storeA
-	policyEngines["tenantA"] = policy.NewPolicyEngine(storeA)
+	policyGraphs["tenantA"] = gA
+	policyEngines["tenantA"] = policy.NewPolicyEngine(storeA, gA)
 	policyFiles["tenantA"] = fileA.Name()
 	policyStores["tenantB"] = storeB
-	policyEngines["tenantB"] = policy.NewPolicyEngine(storeB)
+	policyGraphs["tenantB"] = gB
+	policyEngines["tenantB"] = policy.NewPolicyEngine(storeB, gB)
 	policyFiles["tenantB"] = fileB.Name()
 
 	reqA := `{"tenantID":"tenantA","subject":"alice","resource":"file1","action":"read","conditions":{}}`
