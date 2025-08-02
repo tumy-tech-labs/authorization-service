@@ -220,6 +220,9 @@ When `alice` makes a request the evaluator will consider `mary`'s policies if `a
 have direct access. The resulting decision includes the `delegator` field indicating which user
 granted the effective permission.
 
+If no applicable policies exist along the chain, the request is denied and the `delegator` field
+is omitted from the response.
+
 **Sample request via delegation:**
 
 ```sh

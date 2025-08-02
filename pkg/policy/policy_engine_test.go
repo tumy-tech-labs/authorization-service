@@ -215,9 +215,12 @@ func TestEvaluateDelegationChainInvalid(t *testing.T) {
 	g := graph.New()
 	g.AddRelation("user:alice", "user:mary")
 
-	engine := NewPolicyEngine(store, g)
-	dec := engine.Evaluate("alice", "file1", "read", nil)
-	if dec.Allow {
-		t.Fatalf("expected delegation chain to deny access, got %#v", dec)
-	}
+        engine := NewPolicyEngine(store, g)
+        dec := engine.Evaluate("alice", "file1", "read", nil)
+       if dec.Allow {
+               t.Fatalf("expected delegation chain to deny access, got %#v", dec)
+       }
+       if dec.Delegator != "" {
+               t.Fatalf("unexpected delegator %q for failed delegation", dec.Delegator)
+       }
 }
