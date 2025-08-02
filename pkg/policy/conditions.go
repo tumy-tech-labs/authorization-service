@@ -6,13 +6,11 @@ import "time"
 var now = time.Now
 
 // evaluateConditions checks whether all policy conditions are satisfied using the
-// provided environment values. It returns a map of condition evaluation results
-// and a boolean indicating if all conditions passed.
-func evaluateConditions(policyConds map[string]string, env map[string]string) (map[string]bool, bool) {
+// provided environment values. It returns true if all conditions pass.
+func evaluateConditions(policyConds map[string]string, env map[string]string) bool {
 	if len(policyConds) == 0 {
-		return nil, true
+		return true
 	}
-	results := make(map[string]bool)
 	for key, expected := range policyConds {
 		var res bool
 		switch key {
@@ -25,12 +23,11 @@ func evaluateConditions(policyConds map[string]string, env map[string]string) (m
 				res = false
 			}
 		}
-		results[key] = res
 		if !res {
-			return results, false
+			return false
 		}
 	}
-	return results, true
+	return true
 }
 
 // evaluateTimeCondition evaluates the "time" condition. The expected value

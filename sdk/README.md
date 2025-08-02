@@ -53,9 +53,9 @@ async function evaluatePolicy() {
     const token = await sdk.generateToken();
 
     // Call SDK method to evaluate policy
-    const allowed = await sdk.checkAccess(token, subject, resource, action);
+    const decision = await sdk.checkAccess(token, subject, resource, action);
 
-    console.log(`Policy Evaluation Result: ${allowed}`);
+    console.log('Policy Evaluation Result:', decision);
   } catch (error) {
     console.error('Error:', error.message);
   }
@@ -94,8 +94,8 @@ async function checkAccess() {
   const action = 'read';
 
   try {
-    const allowed = await sdk.checkAccess(token, subject, resource, action);
-    console.log(`Access Allowed: ${allowed}`);
+    const decision = await sdk.checkAccess(token, subject, resource, action);
+    console.log('Access Decision:', decision);
   } catch (error) {
     console.error('Failed to check access:', error.message);
   }
