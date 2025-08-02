@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
@@ -37,8 +41,79 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("policy is valid")
+	case "tenant":
+		handleTenant(os.Args[2:])
 	default:
-		fmt.Println("usage: policyctl <compile|validate> ...")
+		fmt.Println("usage: policyctl <compile|validate|tenant> ...")
+		os.Exit(1)
+	}
+}
+
+func handleTenant(args []string) {
+	if len(args) < 1 {
+		fmt.Println("usage: policyctl tenant <create|delete|list> ...")
+		os.Exit(1)
+	}
+	base := os.Getenv("POLICYCTL_ADDR")
+	if base == "" {
+		base = "http://localhost:8080"
+	}
+	token := os.Getenv("POLICYCTL_TOKEN")
+	client := &http.Client{}
+	switch args[0] {
+	case "create":
+		if len(args) < 2 {
+			fmt.Println("usage: policyctl tenant create <id>")
+			os.Exit(1)
+		}
+		data, _ := json.Marshal(map[string]string{"tenantID": args[1], "name": args[1]})
+		req, _ := http.NewRequest(http.MethodPost, base+"/tenant/create", bytes.NewReader(data))
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("request error:", err)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(body))
+	case "delete":
+		if len(args) < 2 {
+			fmt.Println("usage: policyctl tenant delete <id>")
+			os.Exit(1)
+		}
+		data, _ := json.Marshal(map[string]string{"tenantID": args[1]})
+		req, _ := http.NewRequest(http.MethodPost, base+"/tenant/delete", bytes.NewReader(data))
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("request error:", err)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(body))
+	case "list":
+		req, _ := http.NewRequest(http.MethodGet, base+"/tenant/list", nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("request error:", err)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(body))
+	default:
+		fmt.Println("usage: policyctl tenant <create|delete|list> ...")
 		os.Exit(1)
 	}
 }
