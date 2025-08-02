@@ -215,19 +215,30 @@ To develop and test the service, follow these steps:
 
 ### Docker Deployment
 
-To build and run the service using Docker:
+The project ships with a `Dockerfile` and a `docker-compose.yml` for running the
+service in a containerized environment.
 
-1. Build the Docker image:
-
-    ```sh
-    docker build -t authorization-service .
-    ```
-
-2. Run the Docker container:
+1. Create a `.env` file in the project root with the required variables
+   (`CLIENT_ID`, `CLIENT_SECRET`, `JWT_SECRET`, `PORT`).
+2. Start the service:
 
     ```sh
-    docker run -d -p 8080:8080 --env-file .env authorization-service
+    docker compose up --build
     ```
+
+3. Stop the service:
+
+    ```sh
+    docker compose down
+    ```
+
+For convenience, a `Makefile` is provided:
+
+```sh
+make up     # Start services using docker compose
+make down   # Stop services
+make test   # Run unit tests
+```
 
 ### Contributing
 
