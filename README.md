@@ -28,6 +28,7 @@ Authorization Service is an open-source authorization service that reads policie
    STORE_BACKEND=memory # or sqlite
    OIDC_ISSUER=https://issuer.example.com
    OIDC_AUDIENCE=my-client-id
+   LOG_LEVEL=info
    ```
 
 ### Usage
@@ -47,8 +48,20 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 
 ### Observability
 
-The service emits structured JSON logs for every request. Each log entry contains a
-`correlation_id` so individual requests can be traced across components. Example:
+The service emits structured JSON logs for every request. Each log entry contains the
+following fields:
+
+- `timestamp` – time the log entry was recorded (UTC)
+- `correlation_id` – UUID generated per request
+- `tenant_id` – tenant associated with the action
+- `subject` – authenticated user or subject
+- `action` – operation being performed
+- `resource` – resource acted upon
+- `decision` – allow/deny/success/error outcome
+- `policy_id` – policy involved in the decision
+- `reason` – additional context
+
+Example access log:
 
 ```json
 {
@@ -65,12 +78,25 @@ The service emits structured JSON logs for every request. Each log entry contain
 }
 ```
 
+Example error log:
+
+```json
+{
+  "timestamp": "2024-01-01T00:00:00Z",
+  "level": "error",
+  "correlation_id": "123e4567-e89b-12d3-a456-426614174000",
+  "action": "tenant_list",
+  "reason": "failed to list tenants"
+}
+```
+
 Prometheus metrics and OpenTelemetry traces are also exposed. To scrape metrics, point
 Prometheus at the `/metrics` endpoint. Traces can be exported by configuring the standard
 `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable.
 
-Set `LOG_LEVEL=debug` in the environment to enable verbose logging; the default level is
-`info`.
+Set `LOG_LEVEL` to control verbosity (`debug`, `info`, `warn`, `error`). The default level
+is `info`. Sensitive values such as secrets or raw tokens are deliberately omitted from
+all logs.
 
 ### OIDC Configuration
 

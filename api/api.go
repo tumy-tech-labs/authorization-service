@@ -362,9 +362,21 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 func ListTenants(w http.ResponseWriter, r *http.Request) {
 	list, err := backend.ListTenants(r.Context())
 	if err != nil {
+		auditLogger.Log(logger.Entry{
+			Level:         "error",
+			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+			Action:        "tenant_list",
+			Reason:        err.Error(),
+		})
 		http.Error(w, "failed to list tenants", http.StatusInternalServerError)
 		return
 	}
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		Action:        "tenant_list",
+		Decision:      "success",
+	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
 }
