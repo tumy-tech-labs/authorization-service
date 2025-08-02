@@ -205,6 +205,12 @@ policyctl graph list
 The relationship graph also supports user-to-user delegation. When a user delegates to another,
 the delegate can act on behalf of the delegator through a chain of delegation edges.
 
+Common use cases include:
+
+- **Vacation coverage**: Mary grants Alice temporary rights to approve invoices while she is away.
+- **Tiered support**: First-line support engineers can delegate complex changes to higher-tier members.
+- **Emergency access**: On-call engineers can delegate access to incident responders when needed.
+
 ```sh
 # allow alice to act as mary
 policyctl graph delegate alice mary
