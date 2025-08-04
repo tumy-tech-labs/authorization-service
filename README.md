@@ -500,6 +500,9 @@ selected with the `STORE_BACKEND` environment variable:
 * `memory` (default) – stores all data in memory.
 * `sqlite` – persists data in a SQLite database using `STORE_SQLITE_DSN` for the
   connection string (defaults to `file:authorization.db?_foreign_keys=on`).
+* `postgres` – persists data in a PostgreSQL database using `STORE_PG_DSN` for
+  the connection string (defaults to
+  `postgres://postgres:postgres@localhost:5432/authz?sslmode=disable`).
 
 When using SQLite, run the provided migration to create the required tables:
 
@@ -507,13 +510,29 @@ When using SQLite, run the provided migration to create the required tables:
 sqlite3 authorization.db < migrations/001_init.sql
 ```
 
-Developers can run the service with SQLite by setting:
+For PostgreSQL, apply the migration scripts:
 
 ```sh
-export STORE_BACKEND=sqlite
-export STORE_SQLITE_DSN=authorization.db
+psql "$STORE_PG_DSN" -f migrations/001_init.up.sql    # migrate up
+psql "$STORE_PG_DSN" -f migrations/001_init.down.sql  # migrate down
+```
+
+Developers can run the service with a specific backend by setting:
+
+```sh
+export STORE_BACKEND=postgres # or sqlite
+export STORE_PG_DSN=postgres://postgres:postgres@localhost:5432/authz?sslmode=disable
 go run cmd/main.go
 ```
+
+### Policy Backend
+
+Policies can be sourced either from the filesystem (default) or from the
+configured database. Select the behaviour with `POLICY_BACKEND`:
+
+* `file` – load policies from YAML files referenced by `POLICY_FILE`.
+* `db` – load policies from the database and reload them periodically without a
+  service restart.
 
 ### Docker Deployment
 

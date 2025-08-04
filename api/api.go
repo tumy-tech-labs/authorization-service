@@ -30,6 +30,7 @@ var (
 	policyGraphs  map[string]*graph.Graph
 	policyFiles   map[string]string
 	backend       store.Store
+	policyBackend string
 	compiler      policycompiler.Compiler
 	auditLogger   *logger.Logger
 	policyEval    = prometheus.NewCounterVec(
@@ -60,6 +61,11 @@ func init() {
 		panic("failed to init store: " + err.Error())
 	}
 
+	policyBackend = os.Getenv("POLICY_BACKEND")
+	if policyBackend == "" {
+		policyBackend = "file"
+	}
+
 	defaultTenant := "default"
 	defaultFile := os.Getenv("POLICY_FILE")
 	if defaultFile == "" {
@@ -67,9 +73,6 @@ func init() {
 	}
 
 	store := policy.NewPolicyStore()
-	if err := store.LoadPolicies(defaultFile); err != nil {
-		panic("Failed to load policies: " + err.Error())
-	}
 	g := graph.New()
 	policyStores[defaultTenant] = store
 	policyGraphs[defaultTenant] = g
@@ -78,6 +81,17 @@ func init() {
 	def := Tenant{ID: defaultTenant, Name: "default", CreatedAt: time.Now()}
 	if err := backend.SaveTenant(context.Background(), def); err != nil {
 		panic("failed to save default tenant: " + err.Error())
+	}
+
+	if policyBackend == "db" {
+		if err := loadPoliciesFromDB(context.Background(), defaultTenant); err != nil {
+			panic("failed to load policies from db: " + err.Error())
+		}
+		go watchPolicies()
+	} else {
+		if err := store.LoadPolicies(defaultFile); err != nil {
+			panic("Failed to load policies: " + err.Error())
+		}
 	}
 
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
@@ -187,36 +201,42 @@ func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	store, ok := policyStores[req.TenantID]
-	if !ok {
+	if _, ok := policyStores[req.TenantID]; !ok {
 		http.Error(w, "tenant not found", http.StatusNotFound)
 		return
 	}
-	file, ok := policyFiles[req.TenantID]
-	if !ok {
-		http.Error(w, "tenant not found", http.StatusNotFound)
-		return
-	}
-	if err := store.LoadPolicies(file); err != nil {
+	if policyBackend == "db" {
+		if err := loadPoliciesFromDB(r.Context(), req.TenantID); err != nil {
+			http.Error(w, "failed to reload policies", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		file, ok := policyFiles[req.TenantID]
+		if !ok {
+			http.Error(w, "tenant not found", http.StatusNotFound)
+			return
+		}
+		if err := policyStores[req.TenantID].LoadPolicies(file); err != nil {
+			auditLogger.Log(logger.Entry{
+				Level:         "error",
+				CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+				TenantID:      req.TenantID,
+				Action:        "reload",
+				Resource:      file,
+				Reason:        err.Error(),
+			})
+			http.Error(w, "failed to reload policies", http.StatusInternalServerError)
+			return
+		}
 		auditLogger.Log(logger.Entry{
-			Level:         "error",
+			Level:         "info",
 			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
 			TenantID:      req.TenantID,
 			Action:        "reload",
 			Resource:      file,
-			Reason:        err.Error(),
+			Decision:      "success",
 		})
-		http.Error(w, "failed to reload policies", http.StatusInternalServerError)
-		return
 	}
-	auditLogger.Log(logger.Entry{
-		Level:         "info",
-		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
-		TenantID:      req.TenantID,
-		Action:        "reload",
-		Resource:      file,
-		Decision:      "success",
-	})
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("policies reloaded"))
 }
@@ -292,6 +312,35 @@ func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("policy is valid"))
 }
 
+func loadPoliciesFromDB(ctx context.Context, tenantID string) error {
+	policies, err := backend.LoadPolicies(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	store, ok := policyStores[tenantID]
+	if !ok {
+		store = policy.NewPolicyStore()
+		policyStores[tenantID] = store
+	}
+	store.ReplacePolicies(policies)
+	return nil
+}
+
+func watchPolicies() {
+	ticker := time.NewTicker(30 * time.Second)
+	for range ticker.C {
+		tenants, err := backend.ListTenants(context.Background())
+		if err != nil {
+			continue
+		}
+		for _, t := range tenants {
+			if _, ok := policyStores[t.ID]; ok {
+				loadPoliciesFromDB(context.Background(), t.ID)
+			}
+		}
+	}
+}
+
 // CreateTenant registers a new tenant with an empty PolicyStore.
 func CreateTenant(w http.ResponseWriter, r *http.Request) {
 	_, span := tracer.Start(r.Context(), "CreateTenant")
@@ -319,6 +368,9 @@ func CreateTenant(w http.ResponseWriter, r *http.Request) {
 	if err := backend.SaveTenant(r.Context(), tenant); err != nil {
 		http.Error(w, "failed to save tenant", http.StatusInternalServerError)
 		return
+	}
+	if policyBackend == "db" {
+		loadPoliciesFromDB(r.Context(), req.TenantID)
 	}
 	auditLogger.Log(logger.Entry{
 		Level:         "info",
