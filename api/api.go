@@ -47,6 +47,8 @@ func init() {
 		log.Printf("warning: could not load .env file: %v", err)
 	}
 
+	middleware.LoadOIDCConfig()
+
 	policyStores = make(map[string]*policy.PolicyStore)
 	policyEngines = make(map[string]*policy.PolicyEngine)
 	policyGraphs = make(map[string]*graph.Graph)
