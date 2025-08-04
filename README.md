@@ -1,5 +1,7 @@
 # Authorization Service
 
+[![CI](https://github.com/bradtumy/authorization-service/actions/workflows/ci.yml/badge.svg)](https://github.com/bradtumy/authorization-service/actions/workflows/ci.yml)
+[![Release](https://github.com/bradtumy/authorization-service/actions/workflows/release.yml/badge.svg)](https://github.com/bradtumy/authorization-service/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Authorization Service is an open-source authorization service that reads policies in a simple CDL and provides authorization decisions based on the information provided.
