@@ -4,7 +4,32 @@
 [![Release](https://github.com/bradtumy/authorization-service/actions/workflows/release.yml/badge.svg)](https://github.com/bradtumy/authorization-service/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/bradtumy/authorization-service.svg)](https://pkg.go.dev/github.com/bradtumy/authorization-service)
+[![Go Report Card](https://goreportcard.com/badge/github.com/bradtumy/authorization-service)](https://goreportcard.com/report/github.com/bradtumy/authorization-service)
+
 Authorization Service is an open-source authorization service that reads policies in a simple CDL and provides authorization decisions based on the information provided.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Flows](docs/flows.md)
+- [API Reference](docs/api.md)
+
+## Quickstart
+
+Run the service locally with Go:
+
+```sh
+git clone https://github.com/bradtumy/authorization-service.git
+cd authorization-service
+go run cmd/main.go
+```
+
+Or launch with Docker:
+
+```sh
+docker compose up --build
+```
 
 ## Getting Started
 
@@ -34,9 +59,9 @@ Authorization Service is an open-source authorization service that reads policie
    LOG_LEVEL=info
   ```
 
-### Usage
+## Usage
 
-#### authzctl CLI
+### authzctl CLI
 
 The repository ships with a small CLI for interacting with the service. Run `make build`
 to compile both the server and the CLI. The `authzctl` binary can read configuration
@@ -59,7 +84,7 @@ Examples:
 Set `AUTHZCTL_ADDR` and `AUTHZCTL_TOKEN` in the environment or use the
 `--addr` and `--token` flags to point the CLI at a remote service.
 
-#### API Endpoints
+### API Endpoints
 
 All requests must include a `tenantID` in the JSON body to scope operations.
 
@@ -122,7 +147,7 @@ decision = client.check_access("default", "alice", "file1", "read")
 print(decision["allow"])
 ```
 
-### Observability
+### Logging
 
 The service emits structured JSON logs for every request. Each log entry contains the
 following fields:
@@ -631,7 +656,14 @@ configured database. Select the behaviour with `POLICY_BACKEND`:
 * `db` – load policies from the database and reload them periodically without a
   service restart.
 
-### Docker Deployment
+## Observability
+
+The service includes built-in instrumentation for metrics and tracing.
+
+- **Metrics**: Prometheus metrics are exposed at `/metrics` and include `http_requests_total`, `http_request_duration_seconds`, and `policy_eval_count` counters.
+- **Tracing**: OpenTelemetry traces are emitted for each request. Configure `OTEL_EXPORTER_OTLP_ENDPOINT` to point to your collector (defaults to `http://localhost:4318`).
+
+## Docker Deployment
 
 The project ships with a `Dockerfile` and a `docker-compose.yml` for running the
 service in a containerized environment.
@@ -658,7 +690,7 @@ make down   # Stop services
 make test   # Run unit tests
 ```
 
-### Helm Deployment
+## Helm Deployment
 
 A Helm chart is available in `helm/authorization-service` for deploying the service to Kubernetes clusters such as Minikube or Kind.
 
@@ -680,27 +712,27 @@ helm install authz helm/authorization-service \
   --set service.port=9090
 ```
 
-### Contributing
+## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### How to file issues
+## How to file issues
 
 If you encounter a bug or have a feature request, please [open an issue](https://github.com/bradtumy/authorization-service/issues/new/choose).
 Use the provided templates to ensure we have the details needed to address your report.
 
-### Governance
+## Governance
 
 Project roles, maintainer responsibilities, and review processes are documented in [GOVERNANCE.md](GOVERNANCE.md).
 
-### Security
+## Security
 
 For information on reporting vulnerabilities, please see [SECURITY.md](SECURITY.md).
 
-### Code of Conduct
+## Code of Conduct
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) to understand the expectations for participants in this project.
 
-### License
+## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
