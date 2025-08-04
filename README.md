@@ -212,7 +212,7 @@ providers:
     audience: account
 ```
 
-The middleware fetches each issuer's JWKS and caches the keys with automatic expiry, allowing key rotation without service restarts.
+The middleware fetches each issuer's JWKS and caches the keys with automatic expiry, allowing key rotation without service restarts. JWKS documents are refreshed automatically at a configurable interval and whenever tokens with new key IDs are encountered, so new signing keys are picked up without downtime.
 
 #### Keycloak example
 
