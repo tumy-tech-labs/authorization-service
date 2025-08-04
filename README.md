@@ -595,6 +595,21 @@ psql "$STORE_PG_DSN" -f migrations/001_init.up.sql    # migrate up
 psql "$STORE_PG_DSN" -f migrations/001_init.down.sql  # migrate down
 ```
 
+#### Local PostgreSQL Testing
+
+For a quick local environment you can run Postgres in Docker and execute the
+integration tests against it:
+
+```sh
+docker run --rm -d --name authz-postgres -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=authz -p 5432:5432 postgres:16-alpine
+psql "postgres://postgres:postgres@localhost:5432/authz?sslmode=disable" \
+  -f migrations/001_init.up.sql
+STORE_BACKEND=postgres STORE_PG_DSN=postgres://postgres:postgres@localhost:5432/authz?sslmode=disable \
+  go test ./tests/integration -run PostgresPersistence
+docker stop authz-postgres
+```
+
 Developers can run the service with a specific backend by setting:
 
 ```sh
