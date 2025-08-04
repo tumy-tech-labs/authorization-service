@@ -33,3 +33,4 @@ docker-compose.override.yml
 
 # Miscellaneous
 *.swp
+*.db
