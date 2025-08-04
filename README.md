@@ -68,6 +68,34 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 | POST   | `/tenant/delete`| Remove an existing tenant                        |
 | GET    | `/tenant/list`  | List all tenants                                |
 
+### SDK Usage
+
+#### Go
+
+```go
+client := sdk.NewClient("http://localhost:8080")
+decision, err := client.CheckAccess(sdk.AccessRequest{
+    TenantID: "default",
+    Subject:  "alice",
+    Resource: "file1",
+    Action:   "read",
+})
+if err != nil {
+    panic(err)
+}
+fmt.Println(decision.Allow)
+```
+
+#### Python
+
+```python
+from authorization import Client
+
+client = Client("http://localhost:8080")
+decision = client.check_access("default", "alice", "file1", "read")
+print(decision["allow"])
+```
+
 ### Observability
 
 The service emits structured JSON logs for every request. Each log entry contains the
