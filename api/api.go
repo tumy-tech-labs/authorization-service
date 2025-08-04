@@ -10,6 +10,7 @@ import (
 
 	"github.com/bradtumy/authorization-service/internal/logger"
 	"github.com/bradtumy/authorization-service/internal/middleware"
+	"github.com/bradtumy/authorization-service/pkg/contextprovider"
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
@@ -21,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -40,7 +42,8 @@ var (
 		},
 		[]string{"decision"},
 	)
-	tracer trace.Tracer
+	tracer           trace.Tracer
+	contextProviders contextprovider.Chain
 )
 
 func init() {
@@ -99,6 +102,11 @@ func init() {
 	auditLogger = logger.New(os.Stdout, lvl)
 	prometheus.MustRegister(policyEval)
 	tracer = otel.Tracer("authorization-service")
+	contextProviders = contextprovider.Chain{
+		contextprovider.TimeProvider{},
+		contextprovider.GeoIPProvider{},
+		contextprovider.RiskProvider{},
+	}
 }
 
 type AccessRequest struct {
@@ -163,8 +171,18 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Evaluate permissions using the PolicyEngine
+	// Gather runtime context and evaluate permissions using the PolicyEngine
+	ctxVals := contextProviders.GetContext(r)
+	if req.Conditions == nil {
+		req.Conditions = make(map[string]string)
+	}
+	for k, v := range ctxVals {
+		req.Conditions[k] = v
+	}
 	_, evalSpan := tracer.Start(ctx, "PolicyEvaluation")
+	for k, v := range ctxVals {
+		evalSpan.SetAttributes(attribute.String(k, v))
+	}
 	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
 	evalSpan.End()
 
