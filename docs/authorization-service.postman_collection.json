@@ -1,0 +1,89 @@
+{
+  "info": {
+    "name": "Authorization Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Check Access",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantID\": \"default\",\n  \"subject\": \"alice\",\n  \"resource\": \"file1\",\n  \"action\": \"read\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/check-access",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "check-access"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Compile Rule",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantID\": \"default\",\n  \"rule\": \"allow alice to read file1\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/compile",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "compile"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Validate Policy",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantID\": \"default\",\n  \"policy\": \"policies: []\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/validate-policy",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "validate-policy"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ]
+}
