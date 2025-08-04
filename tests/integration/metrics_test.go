@@ -3,10 +3,12 @@ package integration
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	api "github.com/bradtumy/authorization-service/api"
+	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -21,6 +23,8 @@ var httpRequests *prometheus.CounterVec
 
 func setupServer(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
+	os.Setenv("OIDC_CONFIG_FILE", "/dev/null")
+	middleware.LoadOIDCConfig()
 	router := api.SetupRouter()
 	srv := httptest.NewServer(router)
 	tok := token(t)

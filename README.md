@@ -68,6 +68,28 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 | POST   | `/tenant/delete`| Remove an existing tenant                        |
 | GET    | `/tenant/list`  | List all tenants                                |
 
+### Multi-Tenant Example
+
+Each tenant references its own policy file and access checks are scoped by the `tenantID` field. The following example creates two tenants and demonstrates isolated access evaluations:
+
+```sh
+# create tenants
+./authzctl tenant create acme
+./authzctl tenant create globex
+
+# load or reload policies for each tenant
+curl -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
+  -d '{"tenantID":"acme"}'   http://localhost:8080/reload
+curl -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
+  -d '{"tenantID":"globex"}' http://localhost:8080/reload
+
+# check access within each tenant
+./authzctl check-access --tenant acme --subject alice --resource file1 --action read
+./authzctl check-access --tenant globex --subject bob --resource file1 --action read
+```
+
+Requests for one tenant will not evaluate policies from another tenant.
+
 ### SDK Usage
 
 #### Go

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	api "github.com/bradtumy/authorization-service/api"
+	"github.com/bradtumy/authorization-service/internal/middleware"
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	jwt "github.com/golang-jwt/jwt/v4"
@@ -39,6 +40,8 @@ func token(t *testing.T) string {
 }
 
 func TestMultiTenantIsolation(t *testing.T) {
+	os.Setenv("OIDC_CONFIG_FILE", "/dev/null")
+	middleware.LoadOIDCConfig()
 	router := api.SetupRouter()
 	srv := httptest.NewServer(router)
 	defer srv.Close()
@@ -105,7 +108,7 @@ policies:
 - name: "admin"
   policies: ["p1"]
 users:
-- username: "alice"
+- username: "bob"
   roles: ["admin"]
 policies:
 - id: "p1"
@@ -115,7 +118,7 @@ policies:
     - "file1"
   action:
     - "read"
-  effect: "deny"
+  effect: "allow"
 `
 	if err := os.WriteFile(fileB.Name(), []byte(policyB), 0644); err != nil {
 		t.Fatalf("write B: %v", err)
@@ -141,8 +144,8 @@ policies:
 	policyEngines["globex"] = policy.NewPolicyEngine(storeB, gB)
 	policyFiles["globex"] = fileB.Name()
 
-	check := func(tenantID string) policy.Decision {
-		body := fmt.Sprintf(`{"tenantID":"%s","subject":"alice","resource":"file1","action":"read","conditions":{}}`, tenantID)
+	check := func(tenantID, subject string) policy.Decision {
+		body := fmt.Sprintf(`{"tenantID":"%s","subject":"%s","resource":"file1","action":"read","conditions":{}}`, tenantID, subject)
 		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/check-access", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+tok)
@@ -161,11 +164,17 @@ policies:
 		return dec
 	}
 
-	if !check("acme").Allow {
-		t.Fatalf("acme expected allow")
+	if !check("acme", "alice").Allow {
+		t.Fatalf("acme alice expected allow")
 	}
-	if check("globex").Allow {
-		t.Fatalf("globex expected deny")
+	if check("acme", "bob").Allow {
+		t.Fatalf("acme bob expected deny")
+	}
+	if !check("globex", "bob").Allow {
+		t.Fatalf("globex bob expected allow")
+	}
+	if check("globex", "alice").Allow {
+		t.Fatalf("globex alice expected deny")
 	}
 
 	policyGraphs["acme"].AddRelation("user:alice", "group:team")
