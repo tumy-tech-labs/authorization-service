@@ -155,6 +155,27 @@ scrape_configs:
 The exporter publishes `http_requests_total`, `http_request_duration_seconds`, and
 `policy_eval_count` metrics.
 
+#### Validating Metrics Locally
+
+1. Start the service:
+
+```sh
+POLICY_FILE=configs/policies.yaml go run cmd/main.go
+```
+
+2. In another terminal, issue a request and inspect the metrics:
+
+```sh
+curl -H 'Authorization: Bearer test' \
+  -H 'Content-Type: application/json' \
+  -d '{"tenantID":"default","subject":"user1","resource":"file1","action":"read","conditions":{}}' \
+  http://localhost:8080/check-access
+curl -H 'Authorization: Bearer test' http://localhost:8080/metrics
+```
+
+The metrics output will show counters such as `http_requests_total` and
+`policy_eval_count`, along with latency histograms for each path.
+
 #### Tracing
 
 Distributed traces are emitted via OpenTelemetry. Run a local Jaeger instance and point
