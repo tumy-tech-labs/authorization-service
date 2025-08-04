@@ -682,6 +682,14 @@ helm install authz helm/authorization-service \
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+### Governance
+
+Project roles, maintainer responsibilities, and review processes are documented in [GOVERNANCE.md](GOVERNANCE.md).
+
+### Security
+
+For information on reporting vulnerabilities, please see [SECURITY.md](SECURITY.md).
+
 ### Code of Conduct
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) to understand the expectations for participants in this project.
