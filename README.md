@@ -14,6 +14,7 @@ Authorization Service is an open-source authorization service that reads policie
 - [Architecture](docs/ARCHITECTURE.md)
 - [Flows](docs/flows.md)
 - [API Reference](docs/api.md)
+- [Roadmap](ROADMAP.md)
 
 ## Quickstart
 
@@ -715,6 +716,7 @@ helm install authz helm/authorization-service \
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+New contributors can start with our [good first issues](https://github.com/bradtumy/authorization-service/issues?q=is%3Aopen+label%3A%22good+first+issue%22).
 
 ## How to file issues
 
