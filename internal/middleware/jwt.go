@@ -92,7 +92,13 @@ func fetchJWKS(issuer string) (*keyfunc.JWKS, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&conf); err != nil {
 		return nil, err
 	}
-	return keyfunc.Get(conf.JWKSURI, keyfunc.Options{RefreshInterval: time.Hour, RefreshTimeout: 5 * time.Second})
+	interval := time.Hour
+	if s := os.Getenv("OIDC_JWKS_REFRESH_INTERVAL"); s != "" {
+		if d, err := time.ParseDuration(s); err == nil {
+			interval = d
+		}
+	}
+	return keyfunc.Get(conf.JWKSURI, keyfunc.Options{RefreshInterval: interval, RefreshTimeout: 5 * time.Second, RefreshUnknownKID: true})
 }
 
 // JWTMiddleware validates ID tokens using OIDC providers and JWKS.
