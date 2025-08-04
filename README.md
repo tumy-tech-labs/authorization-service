@@ -542,6 +542,28 @@ make down   # Stop services
 make test   # Run unit tests
 ```
 
+### Helm Deployment
+
+A Helm chart is available in `helm/authorization-service` for deploying the service to Kubernetes clusters such as Minikube or Kind.
+
+1. Copy the provided `helm/authorization-service/example-values.yaml` and adjust it for your environment.
+2. Install the chart:
+
+   ```sh
+   helm install authz helm/authorization-service -f values.yaml
+   ```
+
+   Image repository, tag, replica count, service port, OIDC settings, policy backend, resources, and additional environment variables or secrets can be overridden via the values file or `--set` flags.
+
+Example inline overrides:
+
+```sh
+helm install authz helm/authorization-service \
+  --set image.repository=myrepo/authorization-service \
+  --set image.tag=v1.0.0 \
+  --set service.port=9090
+```
+
 ### Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.

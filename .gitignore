@@ -1,5 +1,5 @@
 # Binaries
-authorization-service
+/authorization-service
 *.exe
 *.out
 
