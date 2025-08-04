@@ -682,6 +682,10 @@ helm install authz helm/authorization-service \
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+### Code of Conduct
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) to understand the expectations for participants in this project.
+
 ### License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
