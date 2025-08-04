@@ -12,7 +12,7 @@ import (
 	api "github.com/bradtumy/authorization-service/api"
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 import _ "unsafe"

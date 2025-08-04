@@ -23,13 +23,12 @@ Authorization Service is an open-source authorization service that reads policie
    ```sh
    CLIENT_ID=my-client-id
    CLIENT_SECRET=my-client-secret
-   JWT_SECRET=my-jwt-secret
    PORT=8080
    STORE_BACKEND=memory # or sqlite
-   OIDC_ISSUER=https://issuer.example.com
-   OIDC_AUDIENCE=my-client-id
+   OIDC_ISSUERS=https://issuer.example.com
+   OIDC_AUDIENCES=my-client-id
    LOG_LEVEL=info
-   ```
+  ```
 
 ### Usage
 
@@ -124,42 +123,42 @@ all logs.
 
 ### OIDC Configuration
 
-Tokens presented to the service are validated using an OpenID Connect issuer. Configure
-`OIDC_ISSUER` and `OIDC_AUDIENCE` in `.env` to enable JWKS validation. Example with
-Keycloak:
+Tokens presented to the service are validated against one or more OpenID Connect issuers. Providers can be configured via environment variables or a YAML file.
+
+**Environment variables**
 
 ```
-OIDC_ISSUER=http://localhost:8080/realms/master
-OIDC_AUDIENCE=account
+OIDC_ISSUERS=http://localhost:8080/realms/master
+OIDC_AUDIENCES=account
 ```
 
-The middleware will automatically fetch and cache the JWKS for signature verification.
+**YAML file**
 
-#### Generate JWT
+```
+providers:
+  - issuer: http://localhost:8080/realms/master
+    audience: account
+```
 
-To generate a client credential JWT token:
+The middleware fetches each issuer's JWKS and caches the keys with automatic expiry, allowing key rotation without service restarts.
 
-1. Navigate to the `scripts` directory:
+#### Keycloak example
 
-   ```sh
-   cd scripts
-   ```
+For Keycloak running locally:
 
-2. Run the `generate_jwt.go` script:
+1. Create a client in your realm and note its `client_id`.
+2. Obtain a token using the client credentials flow:
 
-   ```sh
-   go run generate_jwt.go
-   ```
+```
+curl -d 'client_id=account' -d 'client_secret=<secret>' \
+  http://localhost:8080/realms/master/protocol/openid-connect/token
+```
 
-3. The script will output a JWT token:
-
-   ```sh
-   Generated JWT Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-   ```
+Use the returned `access_token` as the Bearer token when calling the service.
 
 #### Request Policy Decision
 
-Use the generated JWT token to request a policy decision from the authorization service.
+Use an access token issued by your OIDC provider to request a policy decision from the authorization service.
 
 1. Start the server:
 
@@ -172,7 +171,7 @@ Use the generated JWT token to request a policy decision from the authorization 
    ```sh
    curl -X POST http://localhost:8080/check-access \
        -H "Content-Type: application/json" \
-       -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+       -H "Authorization: Bearer <JWT>" \
        -d '{
            "tenantID": "default",
            "subject": "user1",
@@ -467,7 +466,7 @@ To develop and test the service, follow these steps:
 2. Run tests:
 
    ```sh
-   POLICY_FILE=../configs/policies.yaml JWT_SECRET=secret go test ./...
+   POLICY_FILE=../configs/policies.yaml go test ./...
    ```
 
 ### Persistence Backends
@@ -499,7 +498,7 @@ The project ships with a `Dockerfile` and a `docker-compose.yml` for running the
 service in a containerized environment.
 
 1. Create a `.env` file in the project root with the required variables
-   (`CLIENT_ID`, `CLIENT_SECRET`, `JWT_SECRET`, `PORT`).
+   (`CLIENT_ID`, `CLIENT_SECRET`, `PORT`, `OIDC_ISSUERS`, `OIDC_AUDIENCES`).
 2. Start the service:
 
    ```sh

@@ -7,14 +7,14 @@ import (
 
 	"os"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/joho/godotenv"
 )
 
 // CustomClaims defines the structure for our custom JWT claims
 type CustomClaims struct {
 	ClientID string `json:"client_id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 func main() {
@@ -41,9 +41,9 @@ func main() {
 	// Create the JWT claims, which includes the client ID and standard claims
 	claims := CustomClaims{
 		ClientID: clientID,
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "authorization-service",
-			ExpiresAt: time.Now().Add(time.Hour * 24).Unix(), // Token expires in 24 hours
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)), // Token expires in 24 hours
 		},
 	}
 
