@@ -682,6 +682,11 @@ helm install authz helm/authorization-service \
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+### How to file issues
+
+If you encounter a bug or have a feature request, please [open an issue](https://github.com/bradtumy/authorization-service/issues/new/choose).
+Use the provided templates to ensure we have the details needed to address your report.
+
 ### Governance
 
 Project roles, maintainer responsibilities, and review processes are documented in [GOVERNANCE.md](GOVERNANCE.md).
