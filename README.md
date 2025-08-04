@@ -228,6 +228,10 @@ curl -d 'client_id=account' -d 'client_secret=<secret>' \
 
 Use the returned `access_token` as the Bearer token when calling the service.
 
+```sh
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/metrics
+```
+
 #### Request Policy Decision
 
 Use an access token issued by your OIDC provider to request a policy decision from the authorization service.
@@ -537,8 +541,11 @@ To develop and test the service, follow these steps:
 
 2. Run tests:
 
+   Integration tests exercise the OIDC middleware against a real JWKS endpoint.
+   Provide the policy file path and run all tests:
+
    ```sh
-   POLICY_FILE=../configs/policies.yaml go test ./...
+   POLICY_FILE=$(pwd)/configs/policies.yaml go test ./...
    ```
 
 ### Persistence Backends
