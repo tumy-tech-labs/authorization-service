@@ -90,9 +90,33 @@ Example error log:
 }
 ```
 
-Prometheus metrics and OpenTelemetry traces are also exposed. To scrape metrics, point
-Prometheus at the `/metrics` endpoint. Traces can be exported by configuring the standard
-`OTEL_EXPORTER_OTLP_ENDPOINT` environment variable.
+#### Metrics
+
+Prometheus metrics are exposed at the `/metrics` endpoint. Configure Prometheus with a
+scrape job pointing at the service's port:
+
+```yaml
+scrape_configs:
+  - job_name: "authz"
+    static_configs:
+      - targets: ["localhost:8080"]
+```
+
+The exporter publishes `http_requests_total`, `http_request_duration_seconds`, and
+`policy_eval_count` metrics.
+
+#### Tracing
+
+Distributed traces are emitted via OpenTelemetry. Run a local Jaeger instance and point
+the service at it using the OTLP endpoint:
+
+```sh
+docker run -d -p 4318:4318 -p 16686:16686 jaegertracing/all-in-one
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 go run cmd/main.go
+```
+
+Traces will be visible at `http://localhost:16686`. Any OTLP-compatible backend such as
+Grafana Tempo can be used by adjusting the endpoint.
 
 Set `LOG_LEVEL` to control verbosity (`debug`, `info`, `warn`, `error`). The default level
 is `info`. Sensitive values such as secrets or raw tokens are deliberately omitted from

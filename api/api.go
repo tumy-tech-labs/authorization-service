@@ -116,6 +116,7 @@ type ValidatePolicyRequest struct {
 
 func SetupRouter() *mux.Router {
 	router := mux.NewRouter()
+	router.Use(middleware.TracingMiddleware)
 	router.Use(middleware.CorrelationMiddleware)
 	router.Use(middleware.MetricsMiddleware)
 	router.Use(middleware.JWTMiddleware)
@@ -360,7 +361,9 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 
 // ListTenants returns all registered tenants.
 func ListTenants(w http.ResponseWriter, r *http.Request) {
-	list, err := backend.ListTenants(r.Context())
+	ctx, span := tracer.Start(r.Context(), "ListTenants")
+	defer span.End()
+	list, err := backend.ListTenants(ctx)
 	if err != nil {
 		auditLogger.Log(logger.Entry{
 			Level:         "error",
