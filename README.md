@@ -32,6 +32,29 @@ Authorization Service is an open-source authorization service that reads policie
 
 ### Usage
 
+#### authzctl CLI
+
+The repository ships with a small CLI for interacting with the service. Run `make build`
+to compile both the server and the CLI. The `authzctl` binary can read configuration
+from a `.env` file or via flags.
+
+Examples:
+
+```sh
+# create and delete tenants
+./authzctl tenant create my-tenant
+./authzctl tenant delete my-tenant
+
+# validate a policy file offline
+./authzctl policy validate path/to/policy.yaml
+
+# dry-run access check
+./authzctl check-access --tenant default --subject user1 --resource file1 --action read
+```
+
+Set `AUTHZCTL_ADDR` and `AUTHZCTL_TOKEN` in the environment or use the
+`--addr` and `--token` flags to point the CLI at a remote service.
+
 #### API Endpoints
 
 All requests must include a `tenantID` in the JSON body to scope operations.
