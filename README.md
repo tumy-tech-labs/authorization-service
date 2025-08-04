@@ -98,6 +98,27 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 | POST   | `/tenant/delete`| Remove an existing tenant                        |
 | GET    | `/tenant/list`  | List all tenants                                |
 
+### Context Providers
+
+Runtime context can influence policy decisions. The service includes a pluggable
+framework where each provider implements:
+
+```go
+type ContextProvider interface {
+    GetContext(req *http.Request) (map[string]string, error)
+}
+```
+
+The following providers are enabled by default:
+
+- **TimeProvider** – sets a `business_hours` flag based on the current time.
+- **GeoIPProvider** – extracts the remote IP and returns a stubbed country code.
+- **RiskProvider** – reads a static score from the `X-Risk-Score` header.
+
+Context from all providers is merged with request conditions, passed into policy
+evaluations, and recorded as tracing attributes. Additional providers can be
+added by implementing the interface and registering them in `api/api.go`.
+
 ### Multi-Tenant Example
 
 Each tenant references its own policy file and access checks are scoped by the `tenantID` field. The following example creates two tenants and demonstrates isolated access evaluations:

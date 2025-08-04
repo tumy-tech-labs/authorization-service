@@ -134,6 +134,17 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 	}
 }
 
+func TestEvaluateContextIncluded(t *testing.T) {
+	store := NewPolicyStore()
+	store.Users["user1"] = User{Username: "user1"}
+	engine := NewPolicyEngine(store, graph.New())
+	env := map[string]string{"ip": "1.2.3.4"}
+	dec := engine.Evaluate("user1", "file1", "read", env)
+	if dec.Context["ip"] != "1.2.3.4" {
+		t.Fatalf("expected context to include env values")
+	}
+}
+
 func TestEvaluateGroupMembership(t *testing.T) {
 	store := NewPolicyStore()
 	store.Roles["managers"] = Role{Name: "managers", Policies: []string{"p1"}}
@@ -215,12 +226,12 @@ func TestEvaluateDelegationChainInvalid(t *testing.T) {
 	g := graph.New()
 	g.AddRelation("user:alice", "user:mary")
 
-        engine := NewPolicyEngine(store, g)
-        dec := engine.Evaluate("alice", "file1", "read", nil)
-       if dec.Allow {
-               t.Fatalf("expected delegation chain to deny access, got %#v", dec)
-       }
-       if dec.Delegator != "" {
-               t.Fatalf("unexpected delegator %q for failed delegation", dec.Delegator)
-       }
+	engine := NewPolicyEngine(store, g)
+	dec := engine.Evaluate("alice", "file1", "read", nil)
+	if dec.Allow {
+		t.Fatalf("expected delegation chain to deny access, got %#v", dec)
+	}
+	if dec.Delegator != "" {
+		t.Fatalf("unexpected delegator %q for failed delegation", dec.Delegator)
+	}
 }

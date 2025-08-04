@@ -31,6 +31,9 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		"resource": resource,
 		"action":   action,
 	}
+	for k, v := range env {
+		ctx[k] = v
+	}
 
 	// Collect candidate subjects including delegation chain.
 	subjects := []string{subject}
