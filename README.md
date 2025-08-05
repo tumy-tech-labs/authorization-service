@@ -90,6 +90,9 @@ Examples:
 
 # dry-run access check
 ./authzctl check-access --tenant default --subject user1 --resource file1 --action read
+
+# simulate a policy decision with custom context
+./authzctl simulate --tenant acme --subject user1 --resource file1 --action read --context time=22:00 risk=high
 ```
 
 ### API Endpoints
@@ -99,6 +102,7 @@ All requests must include a `tenantID` in the JSON body to scope operations.
 | Method | Endpoint        | Description                                     |
 | ------ | --------------- | ----------------------------------------------- |
 | POST   | `/check-access` | Evaluate a tenant-scoped access request         |
+| POST   | `/simulate`     | Dry-run a request with custom context          |
 | POST   | `/reload`       | Reload policies for a specific tenant from disk |
 | POST   | `/compile`      | Convert natural language to YAML for a tenant   |
 | POST   | `/tenant/create`| Register a new tenant                            |
