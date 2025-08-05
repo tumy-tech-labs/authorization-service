@@ -129,7 +129,7 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 	if decision.Allow {
 		t.Fatalf("expected access to be denied outside business hours")
 	}
-	if decision.Reason != "conditions not satisfied" {
+	if decision.Reason != "time" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
 	}
 	if len(decision.Remediation) == 0 || decision.Remediation[0] != "Try again during working hours" {
@@ -175,7 +175,7 @@ func TestEvaluateWhenUnsatisfied(t *testing.T) {
 	if decision.Allow {
 		t.Fatalf("expected access to be denied when when conditions not satisfied")
 	}
-	if decision.Reason != "conditions not satisfied" {
+	if decision.Reason != "risk" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
 	}
 	if len(decision.Remediation) == 0 || decision.Remediation[0] != "Require MFA step-up" {

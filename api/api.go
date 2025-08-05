@@ -40,7 +40,7 @@ var (
 			Name: "policy_eval_count",
 			Help: "Number of policy evaluations",
 		},
-		[]string{"decision"},
+		[]string{"decision", "reason"},
 	)
 	tracer           trace.Tracer
 	contextProviders contextprovider.Chain
@@ -194,15 +194,28 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 		evalSpan.SetAttributes(attribute.String(k, v))
 	}
 	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
-	evalSpan.End()
-
-	// Audit log
-	cid := middleware.CorrelationIDFromContext(r.Context())
 	status := "deny"
 	if decision.Allow {
 		status = "allow"
 	}
-	policyEval.WithLabelValues(status).Inc()
+	evalSpan.SetAttributes(
+		attribute.String("decision", status),
+		attribute.String("reason", decision.Reason),
+	)
+	evalSpan.End()
+
+	// Audit log
+	cid := middleware.CorrelationIDFromContext(r.Context())
+	reasonLabel := ""
+	if !decision.Allow {
+		switch decision.Reason {
+		case "risk", "time":
+			reasonLabel = decision.Reason
+		default:
+			reasonLabel = "other"
+		}
+	}
+	policyEval.WithLabelValues(status, reasonLabel).Inc()
 	auditLogger.Log(logger.Entry{
 		Level:         "info",
 		CorrelationID: cid,

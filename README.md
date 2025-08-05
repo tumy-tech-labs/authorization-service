@@ -257,7 +257,9 @@ scrape_configs:
 ```
 
 The exporter publishes `http_requests_total`, `http_request_duration_seconds`, and
-`policy_eval_count` metrics.
+`policy_eval_count` metrics. `policy_eval_count` includes `decision` and `reason`
+labels so denials due to elevated `risk` or outside business `time` windows are
+visible.
 
 #### Validating Metrics Locally
 
@@ -278,12 +280,15 @@ curl -H 'Authorization: Bearer test' http://localhost:8080/metrics
 ```
 
 The metrics output will show counters such as `http_requests_total` and
-`policy_eval_count`, along with latency histograms for each path.
+`policy_eval_count` (e.g. `policy_eval_count{decision="deny",reason="risk"}`),
+along with latency histograms for each path.
 
 #### Tracing
 
-Distributed traces are emitted via OpenTelemetry. Run a local Jaeger instance and point
-the service at it using the OTLP endpoint:
+Distributed traces are emitted via OpenTelemetry. A dedicated
+`ContextEvaluation` span captures attributes like `risk_score` and
+`business_hours` to aid debugging. Run a local Jaeger instance and point the
+service at it using the OTLP endpoint:
 
 ```sh
 docker run -d -p 4318:4318 -p 16686:16686 jaegertracing/all-in-one
@@ -716,8 +721,12 @@ configured database. Select the behaviour with `POLICY_BACKEND`:
 
 The service includes built-in instrumentation for metrics and tracing.
 
-- **Metrics**: Prometheus metrics are exposed at `/metrics` and include `http_requests_total`, `http_request_duration_seconds`, and `policy_eval_count` counters.
-- **Tracing**: OpenTelemetry traces are emitted for each request. Configure `OTEL_EXPORTER_OTLP_ENDPOINT` to point to your collector (defaults to `http://localhost:4318`).
+- **Metrics**: Prometheus metrics are exposed at `/metrics` and include
+  `http_requests_total`, `http_request_duration_seconds`, and
+  `policy_eval_count{decision,reason}` counters.
+- **Tracing**: OpenTelemetry traces are emitted for each request, including a
+  span for context evaluation. Configure `OTEL_EXPORTER_OTLP_ENDPOINT` to point
+  to your collector (defaults to `http://localhost:4318`).
 
 ## Docker Deployment
 

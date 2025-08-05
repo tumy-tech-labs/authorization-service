@@ -66,7 +66,7 @@ func startServer(t *testing.T) *httptest.Server {
 	policyEval = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "policy_eval_count",
 		Help: "Number of policy evaluations",
-	}, []string{"decision"})
+	}, []string{"decision", "reason"})
 	prometheus.MustRegister(policyEval)
 
 	var err error
