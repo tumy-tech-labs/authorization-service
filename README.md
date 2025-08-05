@@ -64,9 +64,19 @@ docker compose up --build
 
 ### authzctl CLI
 
-The repository ships with a small CLI for interacting with the service. Run `make build`
-to compile both the server and the CLI. The `authzctl` binary can read configuration
-from a `.env` file or via flags.
+The repository ships with a small CLI for interacting with the service.
+
+1. **Build the binaries**
+
+   ```sh
+   make build
+   ```
+
+2. **Configure the CLI**
+
+   The `authzctl` binary can read configuration from a `.env` file or via flags.
+   Set `AUTHZCTL_ADDR` and `AUTHZCTL_TOKEN` in the environment, or use the
+   `--addr` and `--token` flags to point the CLI at a running service.
 
 Examples:
 
@@ -81,9 +91,6 @@ Examples:
 # dry-run access check
 ./authzctl check-access --tenant default --subject user1 --resource file1 --action read
 ```
-
-Set `AUTHZCTL_ADDR` and `AUTHZCTL_TOKEN` in the environment or use the
-`--addr` and `--token` flags to point the CLI at a remote service.
 
 ### API Endpoints
 
