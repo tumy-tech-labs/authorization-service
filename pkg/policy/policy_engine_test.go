@@ -134,6 +134,49 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 	}
 }
 
+func TestEvaluateWhenSatisfied(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["partner"] = Role{Name: "partner", Policies: []string{"policy1"}}
+	store.Users["bob"] = User{Username: "bob", Roles: []string{"partner"}}
+	store.Policies["policy1"] = Policy{
+		ID:       "policy1",
+		Subjects: []Subject{{Role: "partner"}},
+		Resource: []string{"dashboard"},
+		Action:   []string{"view"},
+		Effect:   "allow",
+		When:     []string{"context.time == \"business-hours\"", "context.risk < \"medium\""},
+	}
+	engine := NewPolicyEngine(store, graph.New())
+	env := map[string]string{"time": "business-hours", "risk": "low"}
+	decision := engine.Evaluate("bob", "dashboard", "view", env)
+	if !decision.Allow {
+		t.Fatalf("expected access to be allowed when when conditions satisfied")
+	}
+}
+
+func TestEvaluateWhenUnsatisfied(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["partner"] = Role{Name: "partner", Policies: []string{"policy1"}}
+	store.Users["bob"] = User{Username: "bob", Roles: []string{"partner"}}
+	store.Policies["policy1"] = Policy{
+		ID:       "policy1",
+		Subjects: []Subject{{Role: "partner"}},
+		Resource: []string{"dashboard"},
+		Action:   []string{"view"},
+		Effect:   "allow",
+		When:     []string{"context.time == \"business-hours\"", "context.risk < \"medium\""},
+	}
+	engine := NewPolicyEngine(store, graph.New())
+	env := map[string]string{"time": "business-hours", "risk": "high"}
+	decision := engine.Evaluate("bob", "dashboard", "view", env)
+	if decision.Allow {
+		t.Fatalf("expected access to be denied when when conditions not satisfied")
+	}
+	if decision.Reason != "conditions not satisfied" {
+		t.Fatalf("unexpected reason: %s", decision.Reason)
+	}
+}
+
 func TestEvaluateContextIncluded(t *testing.T) {
 	store := NewPolicyStore()
 	store.Users["user1"] = User{Username: "user1"}

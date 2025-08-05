@@ -518,17 +518,20 @@ curl -X POST http://localhost:8080/check-access \
 
 #### Sample policy
 
-```
+```yaml
 policies:
-  - id: "manager-read"
-    description: "Managers can read server1"
+  - id: "partner-access"
+    description: "Partners can view the dashboard during business hours if risk is low"
     subjects:
-      - role: "managers"
+      - role: "partner"
     resource:
-      - "server1"
+      - "dashboard"
     action:
-      - "read"
+      - "view"
     effect: "allow"
+    when:
+      - context.time == "business-hours"
+      - context.risk < "medium"
 ```
 
 #### Example `policies.yaml`

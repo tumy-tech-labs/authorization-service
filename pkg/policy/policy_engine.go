@@ -116,6 +116,13 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 								}
 								return dec
 							}
+							if ok := evaluateWhen(policy.When, env); !ok {
+								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
+								if subj != subject {
+									dec.Delegator = subj
+								}
+								return dec
+							}
 							dec := Decision{PolicyID: policy.ID, Context: ctx}
 							if subj != subject {
 								dec.Delegator = subj
