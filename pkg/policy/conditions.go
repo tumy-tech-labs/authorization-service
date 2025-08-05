@@ -10,11 +10,11 @@ import (
 var now = time.Now
 
 // evaluateConditions checks whether all policy conditions are satisfied using
-// the provided environment values.
-
-func evaluateConditions(policyConds map[string]string, env map[string]string) bool {
+// the provided environment values. It returns false along with the offending
+// condition key when a condition fails.
+func evaluateConditions(policyConds map[string]string, env map[string]string) (bool, string) {
 	if len(policyConds) == 0 {
-		return true
+		return true, ""
 	}
 	for key, expected := range policyConds {
 		var res bool
@@ -29,25 +29,48 @@ func evaluateConditions(policyConds map[string]string, env map[string]string) bo
 			}
 		}
 		if !res {
-			return false
+			return false, key
 		}
 	}
-	return true
+	return true, ""
 }
 
 // evaluateWhen evaluates a list of boolean expressions against the environment.
 // Supported operators are ==, <, and >. Expressions must reference context
-// values using the form `context.key`.
-func evaluateWhen(exprs []string, env map[string]string) bool {
+// values using the form `context.key`. It returns false and the context key if
+// any expression fails.
+func evaluateWhen(exprs []string, env map[string]string) (bool, string) {
 	if len(exprs) == 0 {
-		return true
+		return true, ""
 	}
 	for _, expr := range exprs {
 		if !evaluateExpression(expr, env) {
-			return false
+			key := extractContextKey(expr)
+			return false, key
 		}
 	}
-	return true
+	return true, ""
+}
+
+// extractContextKey attempts to parse the context key from an expression like
+// `context.key < "value"`.
+func extractContextKey(expr string) string {
+	expr = strings.TrimSpace(expr)
+	var parts []string
+	if strings.Contains(expr, "==") {
+		parts = strings.SplitN(expr, "==", 2)
+	} else if strings.Contains(expr, ">") {
+		parts = strings.SplitN(expr, ">", 2)
+	} else if strings.Contains(expr, "<") {
+		parts = strings.SplitN(expr, "<", 2)
+	} else {
+		return ""
+	}
+	left := strings.TrimSpace(parts[0])
+	if strings.HasPrefix(left, "context.") {
+		return strings.TrimPrefix(left, "context.")
+	}
+	return ""
 }
 
 // evaluateExpression parses and evaluates a single expression.

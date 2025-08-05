@@ -70,16 +70,16 @@ func TestCheckAccessRequestCounter(t *testing.T) {
 
 func TestPolicyEvalCounters(t *testing.T) {
 	srv, tok := setupServer(t)
-	allowBefore := testutil.ToFloat64(policyEval.WithLabelValues("allow"))
-	denyBefore := testutil.ToFloat64(policyEval.WithLabelValues("deny"))
+	allowBefore := testutil.ToFloat64(policyEval.WithLabelValues("allow", ""))
+	denyBefore := testutil.ToFloat64(policyEval.WithLabelValues("deny", "other"))
 
 	allowBody := `{"tenantID":"default","subject":"user1","resource":"file1","action":"read","conditions":{}}`
 	denyBody := `{"tenantID":"default","subject":"user2","resource":"file3","action":"edit","conditions":{}}`
 	makeCheckRequest(t, srv, tok, allowBody)
 	makeCheckRequest(t, srv, tok, denyBody)
 
-	allowAfter := testutil.ToFloat64(policyEval.WithLabelValues("allow"))
-	denyAfter := testutil.ToFloat64(policyEval.WithLabelValues("deny"))
+	allowAfter := testutil.ToFloat64(policyEval.WithLabelValues("allow", ""))
+	denyAfter := testutil.ToFloat64(policyEval.WithLabelValues("deny", "other"))
 	if allowAfter != allowBefore+1 {
 		t.Fatalf("expected policy_eval_count allow to increment, before %v after %v", allowBefore, allowAfter)
 	}

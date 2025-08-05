@@ -3,13 +3,18 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	_ "unsafe"
 )
 
-import _ "unsafe"
+func init() {
+	os.Setenv("OIDC_CONFIG_FILE", "/dev/null")
+	os.Setenv("POLICY_FILE", "../configs/policies.yaml")
+}
 
 //go:linkname httpLatency github.com/bradtumy/authorization-service/internal/middleware.httpLatency
 var httpLatency *prometheus.HistogramVec

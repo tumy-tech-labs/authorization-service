@@ -117,15 +117,15 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 					}
 					for _, polAction := range policy.Action {
 						if matchResource && (polAction == "*" || polAction == action) {
-							if ok := evaluateConditions(policy.Conditions, env); !ok {
-								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
+							if ok, reason := evaluateConditions(policy.Conditions, env); !ok {
+								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: reason, Context: ctx}
 								if subj != subject {
 									dec.Delegator = subj
 								}
 								return addRemediation(dec)
 							}
-							if ok := evaluateWhen(policy.When, env); !ok {
-								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
+							if ok, reason := evaluateWhen(policy.When, env); !ok {
+								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: reason, Context: ctx}
 								if subj != subject {
 									dec.Delegator = subj
 								}
