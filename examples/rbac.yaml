@@ -1,0 +1,17 @@
+roles:
+  - name: admin
+    policies:
+      - allow-read-all
+users:
+  - username: alice
+    roles: [admin]
+policies:
+  - id: allow-read-all
+    description: Admins can read any file
+    subjects:
+      - role: admin
+    resources:
+      - "*"
+    actions:
+      - read
+    effect: allow

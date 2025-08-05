@@ -1,0 +1,13 @@
+policies:
+  - id: remediate-mfa
+    description: Require MFA when risk medium
+    subjects:
+      - user: alice
+    resources:
+      - file: secret
+    actions:
+      - read
+    effect: allow
+    remediation:
+      type: mfa
+      timeout: 5m

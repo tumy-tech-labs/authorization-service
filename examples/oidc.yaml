@@ -1,0 +1,10 @@
+policies:
+  - id: oidc-basic
+    description: Use OIDC subject claim
+    subjects:
+      - claim: sub:alice
+    resources:
+      - file: report
+    actions:
+      - read
+    effect: allow

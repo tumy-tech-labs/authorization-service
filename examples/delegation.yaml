@@ -1,0 +1,16 @@
+delegations:
+  - from: user:alice
+    to: user:bob
+    actions: [read]
+    resource: document:report
+    expires: "2024-12-31"
+policies:
+  - id: base
+    description: Alice can read and delegate
+    subjects:
+      - user: alice
+    resources:
+      - document: report
+    actions:
+      - read
+    effect: allow

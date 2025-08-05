@@ -1,0 +1,10 @@
+policies:
+  - id: observable
+    description: Policy used for metrics
+    subjects:
+      - user: alice
+    resources:
+      - file: metrics
+    actions:
+      - read
+    effect: allow
