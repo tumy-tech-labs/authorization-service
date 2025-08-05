@@ -26,9 +26,10 @@ type AccessRequest struct {
 }
 
 type Decision struct {
-	Allow    bool   `json:"allow"`
-	PolicyID string `json:"policyID"`
-	Reason   string `json:"reason"`
+	Allow       bool     `json:"allow"`
+	PolicyID    string   `json:"policyID"`
+	Reason      string   `json:"reason"`
+	Remediation []string `json:"remediation"`
 }
 
 func (c *Client) post(path string, payload any) (*http.Response, error) {

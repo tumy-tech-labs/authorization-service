@@ -132,6 +132,9 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 	if decision.Reason != "conditions not satisfied" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
 	}
+	if len(decision.Remediation) == 0 || decision.Remediation[0] != "Try again during working hours" {
+		t.Fatalf("expected remediation for business hours, got %v", decision.Remediation)
+	}
 }
 
 func TestEvaluateWhenSatisfied(t *testing.T) {
@@ -174,6 +177,9 @@ func TestEvaluateWhenUnsatisfied(t *testing.T) {
 	}
 	if decision.Reason != "conditions not satisfied" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
+	}
+	if len(decision.Remediation) == 0 || decision.Remediation[0] != "Require MFA step-up" {
+		t.Fatalf("expected remediation for high risk, got %v", decision.Remediation)
 	}
 }
 
