@@ -126,6 +126,26 @@ Context from all providers is merged with request conditions, passed into policy
 evaluations, and recorded as tracing attributes. Additional providers can be
 added by implementing the interface and registering them in `api/api.go`.
 
+### Remediation Suggestions
+
+When access is denied due to contextual signals like elevated risk or attempts
+outside of business hours, the decision response includes a `remediation`
+section with actionable next steps. Examples:
+
+```json
+{
+  "allow": false,
+  "reason": "conditions not satisfied",
+  "remediation": ["Require MFA step-up"]
+}
+
+{
+  "allow": false,
+  "reason": "conditions not satisfied",
+  "remediation": ["Try again during working hours"]
+}
+```
+
 ### Multi-Tenant Example
 
 Each tenant references its own policy file and access checks are scoped by the `tenantID` field. The following example creates two tenants and demonstrates isolated access evaluations:
