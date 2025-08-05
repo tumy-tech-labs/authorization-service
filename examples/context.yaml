@@ -1,0 +1,12 @@
+policies:
+  - id: context-risk
+    description: Deny when risk is high
+    subjects:
+      - user: alice
+    resources:
+      - file: secret
+    actions:
+      - read
+    effect: deny
+    conditions:
+      risk: high

@@ -1,0 +1,11 @@
+tenants:
+  - id: acme
+    policies:
+      - id: tenant-policy
+        subjects:
+          - user: alice
+        resources:
+          - file: doc
+        actions:
+          - read
+        effect: allow

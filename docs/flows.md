@@ -1,49 +1,47 @@
 # Flows
 
-## Policy Evaluation
+## Overview
+End-to-end request flows highlight how the service evaluates policies, validates tokens and emits telemetry.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant S as Authorization Service
-    participant PE as Policy Engine
-    C->>S: /check-access request
-    S->>PE: Evaluate policy
-    PE-->>S: Decision (allow/deny)
-    S-->>C: Response
+    participant A as API
+    participant E as Evaluator
+    participant O as Observability
+    C->>A: check-access request
+    A->>E: evaluate policy
+    E-->>A: decision
+    A->>O: metrics & traces
+    A-->>C: allow/deny
 ```
 
-1. Client sends a `check-access` request with a JWT and tenant ID.
-2. Service validates the request and forwards it to the policy engine.
-3. Policy engine evaluates CDL rules and returns a decision.
-4. Service responds to the client with the result.
+## When to Use
+Use these flows to understand integration points and latency.
 
-## OIDC Authentication
+## Policy Example
+See [examples/rbac.yaml](../examples/rbac.yaml).
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant OP as OIDC Provider
-    participant S as Authorization Service
-    U->>OP: Authenticate
-    OP-->>U: JWT
-    U->>S: API call with token
-    S->>OP: Fetch JWKS / validate token
-    S-->>U: Response
+## API Usage
+```sh
+curl -s -X POST http://localhost:8080/check-access \
+  -H 'Content-Type: application/json' \
+  -d '{"tenantID":"acme","subject":"alice","resource":"file1","action":"read"}'
 ```
 
-The service verifies incoming JWTs against configured issuers using their JWKS endpoints.
+## CLI Usage
+```sh
+authzctl check-access --tenant acme --subject alice --resource file1 --action read
+```
+
+## SDK Usage
+Go and Python examples mirror those in [architecture.md](architecture.md).
+
+## Validation/Testing
+Simulate flows locally using the Postman collection or CLI.
 
 ## Observability
+Each step emits spans and metrics; view them via your OpenTelemetry backend.
 
-```mermaid
-sequenceDiagram
-    participant S as Authorization Service
-    participant Prom as Prometheus
-    participant Otel as OTLP Collector
-    Prom-->>S: Scrape /metrics
-    S-->>Prom: Metrics
-    S-->>Otel: Traces
-```
-
-Metrics are exported in Prometheus format and traces are sent via OTLP to the configured collector.
+## Notes & Caveats
+OIDC validation occurs before evaluation when tokens are provided.

@@ -1,0 +1,17 @@
+graphs:
+  - relation: parent
+    subject: folder:reports
+    object: folder:yearly
+  - relation: contains
+    subject: folder:yearly
+    object: document:q1
+policies:
+  - id: graph-read
+    description: Use graph relationships
+    subjects:
+      - user: alice
+    resources:
+      - document:q1
+    actions:
+      - read
+    effect: allow

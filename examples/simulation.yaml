@@ -1,0 +1,10 @@
+policies:
+  - id: simulate-example
+    description: Example for simulation
+    subjects:
+      - user: alice
+    resources:
+      - file: test
+    actions:
+      - read
+    effect: allow

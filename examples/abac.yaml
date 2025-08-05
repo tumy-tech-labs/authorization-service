@@ -1,0 +1,14 @@
+policies:
+  - id: office-hours
+    description: Allow during office hours
+    subjects:
+      - user: alice
+    resources:
+      - document: report
+    actions:
+      - read
+    effect: allow
+    conditions:
+      time:
+        before: "17:00"
+        after: "09:00"
