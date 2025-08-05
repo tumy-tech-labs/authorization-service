@@ -117,6 +117,15 @@ type AccessRequest struct {
 	Conditions map[string]string `json:"conditions"`
 }
 
+// SimulationRequest represents a dry-run evaluation with explicit context.
+type SimulationRequest struct {
+	TenantID string            `json:"tenantID"`
+	Subject  string            `json:"subject"`
+	Resource string            `json:"resource"`
+	Action   string            `json:"action"`
+	Context  map[string]string `json:"context"`
+}
+
 type CompileRequest struct {
 	TenantID string `json:"tenantID"`
 	Rule     string `json:"rule"`
@@ -145,6 +154,7 @@ func SetupRouter() *mux.Router {
 	router.Use(middleware.MetricsMiddleware)
 	router.Use(middleware.JWTMiddleware)
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
+	router.HandleFunc("/simulate", SimulateAccess).Methods("POST")
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
 	router.HandleFunc("/compile", CompileRule).Methods("POST")
 	router.HandleFunc("/validate-policy", ValidatePolicy).Methods("POST")
@@ -206,6 +216,28 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Respond with the authorization decision
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(decision)
+}
+
+// SimulateAccess performs a dry-run policy evaluation without audit logging.
+func SimulateAccess(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "SimulateAccess")
+	defer span.End()
+	var req SimulationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	engine, ok := policyEngines[req.TenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	if req.Context == nil {
+		req.Context = make(map[string]string)
+	}
+	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Context)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(decision)
 }

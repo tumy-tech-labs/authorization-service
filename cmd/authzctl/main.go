@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/bradtumy/authorization-service/pkg/validator"
 	"github.com/joho/godotenv"
@@ -37,6 +38,8 @@ func main() {
 		handlePolicy(args[1:])
 	case "check-access":
 		handleCheckAccess(args[1:], *addr, *token)
+	case "simulate":
+		handleSimulate(args[1:], *addr, *token)
 	default:
 		usage()
 	}
@@ -44,7 +47,7 @@ func main() {
 
 func usage() {
 	fmt.Println("usage: authzctl [--addr URL] [--token TOKEN] <command> [args]")
-	fmt.Println("commands: tenant, policy, check-access")
+	fmt.Println("commands: tenant, policy, check-access, simulate")
 	os.Exit(1)
 }
 
@@ -159,6 +162,54 @@ func handleCheckAccess(args []string, addr, token string) {
 		os.Exit(1)
 	}
 	if !result.Allow {
+		os.Exit(1)
+	}
+}
+
+func handleSimulate(args []string, addr, token string) {
+	fs := flag.NewFlagSet("simulate", flag.ExitOnError)
+	tenant := fs.String("tenant", "", "tenant ID")
+	subject := fs.String("subject", "", "subject performing the action")
+	resource := fs.String("resource", "", "resource being accessed")
+	action := fs.String("action", "", "action to check")
+	firstCtx := fs.String("context", "", "context key=value pairs")
+	fs.Parse(args)
+	if *tenant == "" || *subject == "" || *resource == "" || *action == "" {
+		fmt.Println("usage: authzctl simulate --tenant TENANT --subject SUBJECT --resource RESOURCE --action ACTION --context k=v [k=v...]")
+		os.Exit(1)
+	}
+	ctx := map[string]string{}
+	if *firstCtx != "" {
+		pairs := append([]string{*firstCtx}, fs.Args()...)
+		for _, kv := range pairs {
+			parts := strings.SplitN(kv, "=", 2)
+			if len(parts) == 2 {
+				ctx[parts[0]] = parts[1]
+			}
+		}
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"tenantID": *tenant,
+		"subject":  *subject,
+		"resource": *resource,
+		"action":   *action,
+		"context":  ctx,
+	})
+	req, _ := http.NewRequest(http.MethodPost, addr+"/simulate", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("request error:", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+	if resp.StatusCode >= 300 {
 		os.Exit(1)
 	}
 }
