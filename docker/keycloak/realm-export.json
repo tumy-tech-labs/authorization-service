@@ -47,6 +47,8 @@
     {
       "username": "alice",
       "enabled": true,
+      "firstName": "Alice",
+      "lastName": "Admin",
       "email": "alice@example.com",
       "emailVerified": true,
       "requiredActions": [],
@@ -58,6 +60,8 @@
     {
       "username": "bob",
       "enabled": true,
+      "firstName": "Bob",
+      "lastName": "User",
       "email": "bob@example.com",
       "emailVerified": true,
       "requiredActions": [],
