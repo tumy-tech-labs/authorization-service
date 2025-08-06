@@ -1,35 +1,48 @@
 # OIDC
 
 ## Overview
-The service validates JSON Web Tokens issued by OpenID Connect providers to authenticate subjects.
+The service validates JSON Web Tokens (JWTs) issued by OpenID Connect providers to authenticate subjects.
 
-## When to Use
-Use OIDC when integrating with identity platforms like Okta or Auth0.
+## Local Keycloak Setup
+Run the services with Docker:
 
-## Policy Example
-See [examples/oidc.yaml](../examples/oidc.yaml) where the subject is derived from the `sub` claim.
-
-## API Usage
 ```sh
-curl -s -X POST http://localhost:8080/check-access \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <token>' \
-  -d '{"tenantID":"acme","resource":"file:report","action":"read"}'
+docker compose up --build
 ```
 
-## CLI Usage
+Keycloak will be available at [http://localhost:8081](http://localhost:8081). Log in with the demo users:
+
+| User  | Password | Role        |
+|-------|----------|-------------|
+| alice | alice    | TenantAdmin |
+| bob   | bob      | User        |
+
+## Getting a Token
+Use the password grant to obtain a token via `curl`:
+
 ```sh
-authzctl check-access --tenant acme --resource file:report --action read --token $TOKEN
+curl -s -X POST \
+  http://localhost:8081/realms/authz-service/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&client_id=authz-client&username=alice&password=alice'
 ```
 
-## SDK Usage
-Provide the JWT when constructing the client or on each request.
+The response contains an `access_token` that includes the `roles` and `tenantID` claims.
 
-## Validation/Testing
-Use a test identity provider and supply a valid token to verify rejection of expired or malformed JWTs.
+## Calling the API
+Pass the token in the `Authorization` header when calling protected endpoints:
 
-## Observability
-Token validation errors are logged and surfaced via `oidc_validation_fail_total` metrics.
+```sh
+TOKEN=$(curl -s -X POST \
+  http://localhost:8081/realms/authz-service/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password&client_id=authz-client&username=alice&password=alice' | jq -r .access_token)
 
-## Notes & Caveats
-Clock skew and issuer configuration must match your identity provider.
+curl -X POST http://localhost:8080/user/create \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"tenantID":"acme","username":"charlie","roles":["User"]}'
+```
+
+## Notes
+- `roles` claim lists the user's realm roles.
+- `tenantID` claim is hard coded to `acme` for demo purposes.
