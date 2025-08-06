@@ -36,7 +36,7 @@ Load the sample policy:
 
 ```sh
 cp examples/rbac.yaml configs/policies.yaml
-curl -X POST http://localhost:8080/reload -d '{"tenantID":"acme"}'
+curl -X POST http://localhost:8080/reload -d '{"tenantID":"default"}'
 ```
 
 Expected:
@@ -50,7 +50,7 @@ Check access:
 ```sh
 curl -s -X POST http://localhost:8080/check-access \
   -H 'Content-Type: application/json' \
-  -d '{"tenantID":"acme","subject":"alice","resource":"file1","action":"read"}'
+  -d '{"tenantID":"default","subject":"alice","resource":"file1","action":"read"}'
 ```
 
 Expected response:
@@ -124,12 +124,13 @@ Run a check:
 ```sh
 curl -s -X POST http://localhost:8080/check-access \
   -H 'Content-Type: application/json' \
-  -d '{"tenantID":"acme","subject":"alice","resource":"file1","action":"read"}'
+  -d '{"tenantID":"default","subject":"alice","resource":"file1","action":"read"}'
 ```
 
 ## Documentation
 
 - [Quickstart](docs/quickstart.md)
+- [Local End-to-End Testing](docs/local-testing.md)
 - [Tenants](docs/tenants.md)
 - [Policies](docs/policies.md)
 - [Graph](docs/graph.md)
@@ -155,14 +156,14 @@ Create a user:
 curl -X POST http://localhost:8080/user/create \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <token>' \
-  -d '{"tenantID":"acme","username":"bob"}'
+  -d '{"tenantID":"default","username":"bob"}'
 ```
 
 List users:
 
 ```sh
 curl -H 'Authorization: Bearer <token>' \
-  'http://localhost:8080/user/list?tenantID=acme'
+  'http://localhost:8080/user/list?tenantID=default'
 ```
 
 Additional endpoints support assigning roles, deleting users and fetching a single user. See [docs/users.md](docs/users.md) for details.
