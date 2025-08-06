@@ -187,6 +187,9 @@ func subjectFromRequest(r *http.Request) (string, error) {
 	if _, _, err := parser.ParseUnverified(tokenString, claims); err != nil {
 		return "", err
 	}
+	if username, _ := claims["preferred_username"].(string); username != "" {
+		return username, nil
+	}
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
 		return "", errors.New("missing subject")

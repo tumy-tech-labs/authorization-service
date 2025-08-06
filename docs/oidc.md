@@ -17,6 +17,8 @@ Keycloak will be available at [http://localhost:8081](http://localhost:8081). Lo
 | alice | alice    | TenantAdmin |
 | bob   | bob      | User        |
 
+The authorization service loads matching demo users from `configs/acme/users.yaml` so that `alice` already has the `TenantAdmin` role required to manage users.
+
 ## Getting a Token
 Use the password grant to obtain a token via `curl`:
 
