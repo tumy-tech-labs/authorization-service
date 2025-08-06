@@ -254,6 +254,7 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	if req.Conditions == nil {
 		req.Conditions = make(map[string]string)
 	}
+	req.Conditions["tenantID"] = req.TenantID
 	for k, v := range ctxVals {
 		req.Conditions[k] = v
 	}
@@ -318,6 +319,7 @@ func SimulateAccess(w http.ResponseWriter, r *http.Request) {
 	if req.Context == nil {
 		req.Context = make(map[string]string)
 	}
+	req.Context["tenantID"] = req.TenantID
 	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Context)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(decision)
