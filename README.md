@@ -11,8 +11,55 @@ Authorization-Service is an open-source, multi-tenant, context-aware, risk-adapt
 ```sh
 git clone https://github.com/bradtumy/authorization-service.git
 cd authorization-service
+cp .env.example .env
+# edit as needed
+```
+
+`.env` should contain:
+
+```
+CLIENT_ID=my-client-id
+CLIENT_SECRET=my-client-secret
+JWT_SECRET=my-jwt-secret
+PORT=8080
+OIDC_ISSUERS=http://localhost:8081/realms/master
+OIDC_AUDIENCES=authorization-service
+```
+
+Start the service:
+
+```sh
 docker compose up --build
 ```
+
+Load the sample policy:
+
+```sh
+cp examples/rbac.yaml configs/policies.yaml
+curl -X POST http://localhost:8080/reload -d '{"tenantID":"acme"}'
+```
+
+Expected:
+
+```text
+policies reloaded
+```
+
+Check access:
+
+```sh
+curl -s -X POST http://localhost:8080/check-access \
+  -H 'Content-Type: application/json' \
+  -d '{"tenantID":"acme","subject":"alice","resource":"file1","action":"read"}'
+```
+
+Expected response:
+
+```json
+{"allow":true}
+```
+
+Troubleshooting: if the service fails to start, ensure `.env` exists and the port in use is free.
 
 ### Policy as Code Quickstart
 
