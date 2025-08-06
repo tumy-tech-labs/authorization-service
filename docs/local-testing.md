@@ -1,13 +1,15 @@
 # Local End-to-End Testing
 
-The following steps walk through a complete flow of running the service, creating users, obtaining tokens, and verifying policy decisions.
+The following steps walk through a complete flow of running the service, creating users, obtaining tokens, and verifying policy decisions. The service ships with a default tenant named `default`. For local testing we seed it with demo users copied from the `acme` example.
+
 
 ## 1. Start the stack
 
 ```sh
 cp .env.example .env
 # adjust values as needed
-cp examples/rbac.yaml configs/policies.yaml
+mkdir -p configs/default
+cp configs/acme/users.yaml configs/default/users.yaml
 
 # build and launch the authorization service and Keycloak
  docker compose up --build
@@ -18,7 +20,7 @@ cp examples/rbac.yaml configs/policies.yaml
 In another terminal once the service is running:
 
 ```sh
-curl -X POST http://localhost:8080/reload -d '{"tenantID":"acme"}'
+curl -X POST http://localhost:8080/reload -d '{"tenantID":"default"}'
 ```
 
 Expected:
@@ -49,7 +51,7 @@ TOKEN=$(curl -s -X POST \
 
 ## 4. Create a new user in the service
 
-Use the admin token to register a user `charlie` in tenant `acme` with the `admin` role defined in the sample policy:
+Use the admin token to register a user `charlie` in tenant `default` with the `admin` role defined in the sample policy:
 
 ```sh
 curl -X POST http://localhost:8080/user/create \
@@ -82,7 +84,7 @@ Check that `charlie` can read `file1` according to the sample policy:
 ```sh
 curl -s -X POST http://localhost:8080/check-access \
   -H 'Content-Type: application/json' \
-  -d '{"tenantID":"acme","subject":"charlie","resource":"file1","action":"read"}'
+  -d '{"tenantID":"default","subject":"charlie","resource":"file1","action":"read"}'
 ```
 
 Expected response:
