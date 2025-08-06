@@ -14,6 +14,30 @@ cd authorization-service
 docker compose up --build
 ```
 
+### Policy as Code Quickstart
+
+The service can source policies from a Git repository so that they can be versioned and tested like application code.
+
+1. Clone the [customer-policies](https://github.com/your-org/customer-policies) template.
+2. Write YAML policies under `policies/` and add tests under `tests/`.
+3. Run the following commands locally:
+
+   ```bash
+   authzctl policy validate policies/rbac.yaml   # lint
+   authzctl test tests/                          # run tests
+   authzctl simulate --bundle policies/          # dry‑run
+   authzctl apply-bundle policies/               # deploy
+   ```
+
+4. CI/CD executes the same lint → test → simulate → deploy workflow via `.github/workflows/deploy.yaml`.
+5. After deployment, verify the active policy version:
+
+   ```bash
+   curl -s http://localhost:8080/policies/version
+   ```
+
+The returned commit SHA is also echoed in `/check-access` responses under the `commit` field of the decision.
+
 ## Feature Highlights
 
 - **RBAC** – role-based access control policies.
