@@ -130,6 +130,7 @@ curl -s -X POST http://localhost:8080/check-access \
 ## Documentation
 
 - [Quickstart](docs/quickstart.md)
+- [Local End-to-End Testing](docs/local-testing.md)
 - [Tenants](docs/tenants.md)
 - [Policies](docs/policies.md)
 - [Graph](docs/graph.md)
