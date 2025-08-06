@@ -47,6 +47,9 @@
     {
       "username": "alice",
       "enabled": true,
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "requiredActions": [],
       "credentials": [
         {"type": "password", "value": "alice", "temporary": false}
       ],
@@ -55,6 +58,9 @@
     {
       "username": "bob",
       "enabled": true,
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "requiredActions": [],
       "credentials": [
         {"type": "password", "value": "bob", "temporary": false}
       ],
