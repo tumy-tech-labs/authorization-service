@@ -1,17 +1,20 @@
 package policy
 
-import "time"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 // now is a variable for mocking current time in tests.
 var now = time.Now
 
-
 // evaluateConditions checks whether all policy conditions are satisfied using
-// the provided environment values.
-
-func evaluateConditions(policyConds map[string]string, env map[string]string) bool {
+// the provided environment values. It returns false along with the offending
+// condition key when a condition fails.
+func evaluateConditions(policyConds map[string]string, env map[string]string) (bool, string) {
 	if len(policyConds) == 0 {
-		return true
+		return true, ""
 	}
 	for key, expected := range policyConds {
 		var res bool
@@ -26,10 +29,122 @@ func evaluateConditions(policyConds map[string]string, env map[string]string) bo
 			}
 		}
 		if !res {
-			return false
+			return false, key
 		}
 	}
-	return true
+	return true, ""
+}
+
+// evaluateWhen evaluates a list of boolean expressions against the environment.
+// Supported operators are ==, <, and >. Expressions must reference context
+// values using the form `context.key`. It returns false and the context key if
+// any expression fails.
+func evaluateWhen(exprs []string, env map[string]string) (bool, string) {
+	if len(exprs) == 0 {
+		return true, ""
+	}
+	for _, expr := range exprs {
+		if !evaluateExpression(expr, env) {
+			key := extractContextKey(expr)
+			return false, key
+		}
+	}
+	return true, ""
+}
+
+// extractContextKey attempts to parse the context key from an expression like
+// `context.key < "value"`.
+func extractContextKey(expr string) string {
+	expr = strings.TrimSpace(expr)
+	var parts []string
+	if strings.Contains(expr, "==") {
+		parts = strings.SplitN(expr, "==", 2)
+	} else if strings.Contains(expr, ">") {
+		parts = strings.SplitN(expr, ">", 2)
+	} else if strings.Contains(expr, "<") {
+		parts = strings.SplitN(expr, "<", 2)
+	} else {
+		return ""
+	}
+	left := strings.TrimSpace(parts[0])
+	if strings.HasPrefix(left, "context.") {
+		return strings.TrimPrefix(left, "context.")
+	}
+	return ""
+}
+
+// evaluateExpression parses and evaluates a single expression.
+func evaluateExpression(expr string, env map[string]string) bool {
+	expr = strings.TrimSpace(expr)
+	var op string
+	var parts []string
+	if strings.Contains(expr, "==") {
+		op = "=="
+		parts = strings.SplitN(expr, "==", 2)
+	} else if strings.Contains(expr, ">") {
+		op = ">"
+		parts = strings.SplitN(expr, ">", 2)
+	} else if strings.Contains(expr, "<") {
+		op = "<"
+		parts = strings.SplitN(expr, "<", 2)
+	} else {
+		return false
+	}
+	if len(parts) != 2 {
+		return false
+	}
+	left := strings.TrimSpace(parts[0])
+	right := strings.TrimSpace(parts[1])
+	right = strings.Trim(right, "'\"")
+	if !strings.HasPrefix(left, "context.") {
+		return false
+	}
+	key := strings.TrimPrefix(left, "context.")
+	val, ok := env[key]
+	if !ok {
+		return false
+	}
+	switch op {
+	case "==":
+		return val == right
+	case "<", ">":
+		return compareValues(val, right, op)
+	}
+	return false
+}
+
+// compareValues compares two values using the provided operator. It attempts
+// numeric comparison, then known risk level ordering, and finally falls back to
+// lexical string comparison.
+func compareValues(left, right, op string) bool {
+	if lf, err := strconv.ParseFloat(left, 64); err == nil {
+		if rf, err := strconv.ParseFloat(right, 64); err == nil {
+			switch op {
+			case "<":
+				return lf < rf
+			case ">":
+				return lf > rf
+			}
+		}
+	}
+	order := map[string]int{"low": 1, "medium": 2, "high": 3}
+	if lv, ok := order[strings.ToLower(left)]; ok {
+		if rv, ok := order[strings.ToLower(right)]; ok {
+			switch op {
+			case "<":
+				return lv < rv
+			case ">":
+				return lv > rv
+			}
+		}
+	}
+	switch op {
+	case "<":
+		return left < right
+	case ">":
+		return left > right
+	}
+	return false
 }
 
 // evaluateTimeCondition evaluates the "time" condition. The expected value

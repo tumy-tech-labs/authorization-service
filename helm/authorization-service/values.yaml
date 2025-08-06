@@ -1,0 +1,23 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/example/authorization-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+policyBackend: memory
+
+oidc:
+  clientID: ""
+  clientSecret: ""
+  issuers: ""
+  audiences: ""
+
+env: {}
+secretEnv: {}
+
+resources: {}

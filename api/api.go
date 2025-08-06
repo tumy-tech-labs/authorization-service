@@ -10,6 +10,7 @@ import (
 
 	"github.com/bradtumy/authorization-service/internal/logger"
 	"github.com/bradtumy/authorization-service/internal/middleware"
+	"github.com/bradtumy/authorization-service/pkg/contextprovider"
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/policy"
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
@@ -21,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -30,6 +32,7 @@ var (
 	policyGraphs  map[string]*graph.Graph
 	policyFiles   map[string]string
 	backend       store.Store
+	policyBackend string
 	compiler      policycompiler.Compiler
 	auditLogger   *logger.Logger
 	policyEval    = prometheus.NewCounterVec(
@@ -37,15 +40,18 @@ var (
 			Name: "policy_eval_count",
 			Help: "Number of policy evaluations",
 		},
-		[]string{"decision"},
+		[]string{"decision", "reason"},
 	)
-	tracer trace.Tracer
+	tracer           trace.Tracer
+	contextProviders contextprovider.Chain
 )
 
 func init() {
 	if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
 		log.Printf("warning: could not load .env file: %v", err)
 	}
+
+	middleware.LoadOIDCConfig()
 
 	policyStores = make(map[string]*policy.PolicyStore)
 	policyEngines = make(map[string]*policy.PolicyEngine)
@@ -58,6 +64,11 @@ func init() {
 		panic("failed to init store: " + err.Error())
 	}
 
+	policyBackend = os.Getenv("POLICY_BACKEND")
+	if policyBackend == "" {
+		policyBackend = "file"
+	}
+
 	defaultTenant := "default"
 	defaultFile := os.Getenv("POLICY_FILE")
 	if defaultFile == "" {
@@ -65,9 +76,6 @@ func init() {
 	}
 
 	store := policy.NewPolicyStore()
-	if err := store.LoadPolicies(defaultFile); err != nil {
-		panic("Failed to load policies: " + err.Error())
-	}
 	g := graph.New()
 	policyStores[defaultTenant] = store
 	policyGraphs[defaultTenant] = g
@@ -78,11 +86,27 @@ func init() {
 		panic("failed to save default tenant: " + err.Error())
 	}
 
+	if policyBackend == "db" {
+		if err := loadPoliciesFromDB(context.Background(), defaultTenant); err != nil {
+			panic("failed to load policies from db: " + err.Error())
+		}
+		go watchPolicies()
+	} else {
+		if err := store.LoadPolicies(defaultFile); err != nil {
+			panic("Failed to load policies: " + err.Error())
+		}
+	}
+
 	compiler = policycompiler.NewOpenAICompiler(os.Getenv("OPENAI_API_KEY"))
 	lvl := logger.ParseLevel(os.Getenv("LOG_LEVEL"))
 	auditLogger = logger.New(os.Stdout, lvl)
 	prometheus.MustRegister(policyEval)
 	tracer = otel.Tracer("authorization-service")
+	contextProviders = contextprovider.Chain{
+		contextprovider.TimeProvider{},
+		contextprovider.GeoIPProvider{},
+		contextprovider.RiskProvider{},
+	}
 }
 
 type AccessRequest struct {
@@ -91,6 +115,15 @@ type AccessRequest struct {
 	Resource   string            `json:"resource"`
 	Action     string            `json:"action"`
 	Conditions map[string]string `json:"conditions"`
+}
+
+// SimulationRequest represents a dry-run evaluation with explicit context.
+type SimulationRequest struct {
+	TenantID string            `json:"tenantID"`
+	Subject  string            `json:"subject"`
+	Resource string            `json:"resource"`
+	Action   string            `json:"action"`
+	Context  map[string]string `json:"context"`
 }
 
 type CompileRequest struct {
@@ -116,10 +149,12 @@ type ValidatePolicyRequest struct {
 
 func SetupRouter() *mux.Router {
 	router := mux.NewRouter()
+	router.Use(middleware.TracingMiddleware)
 	router.Use(middleware.CorrelationMiddleware)
 	router.Use(middleware.MetricsMiddleware)
 	router.Use(middleware.JWTMiddleware)
 	router.HandleFunc("/check-access", CheckAccess).Methods("POST")
+	router.HandleFunc("/simulate", SimulateAccess).Methods("POST")
 	router.HandleFunc("/reload", ReloadPolicies).Methods("POST")
 	router.HandleFunc("/compile", CompileRule).Methods("POST")
 	router.HandleFunc("/validate-policy", ValidatePolicy).Methods("POST")
@@ -146,18 +181,41 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Evaluate permissions using the PolicyEngine
+	// Gather runtime context and evaluate permissions using the PolicyEngine
+	ctxVals := contextProviders.GetContext(r)
+	if req.Conditions == nil {
+		req.Conditions = make(map[string]string)
+	}
+	for k, v := range ctxVals {
+		req.Conditions[k] = v
+	}
 	_, evalSpan := tracer.Start(ctx, "PolicyEvaluation")
+	for k, v := range ctxVals {
+		evalSpan.SetAttributes(attribute.String(k, v))
+	}
 	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Conditions)
-	evalSpan.End()
-
-	// Audit log
-	cid := middleware.CorrelationIDFromContext(r.Context())
 	status := "deny"
 	if decision.Allow {
 		status = "allow"
 	}
-	policyEval.WithLabelValues(status).Inc()
+	evalSpan.SetAttributes(
+		attribute.String("decision", status),
+		attribute.String("reason", decision.Reason),
+	)
+	evalSpan.End()
+
+	// Audit log
+	cid := middleware.CorrelationIDFromContext(r.Context())
+	reasonLabel := ""
+	if !decision.Allow {
+		switch decision.Reason {
+		case "risk", "time":
+			reasonLabel = decision.Reason
+		default:
+			reasonLabel = "other"
+		}
+	}
+	policyEval.WithLabelValues(status, reasonLabel).Inc()
 	auditLogger.Log(logger.Entry{
 		Level:         "info",
 		CorrelationID: cid,
@@ -175,6 +233,28 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(decision)
 }
 
+// SimulateAccess performs a dry-run policy evaluation without audit logging.
+func SimulateAccess(w http.ResponseWriter, r *http.Request) {
+	_, span := tracer.Start(r.Context(), "SimulateAccess")
+	defer span.End()
+	var req SimulationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	engine, ok := policyEngines[req.TenantID]
+	if !ok {
+		http.Error(w, "tenant not found", http.StatusNotFound)
+		return
+	}
+	if req.Context == nil {
+		req.Context = make(map[string]string)
+	}
+	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Context)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(decision)
+}
+
 // ReloadPolicies reloads policies from the YAML file.
 func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
 	_, span := tracer.Start(r.Context(), "ReloadPolicies")
@@ -184,36 +264,42 @@ func ReloadPolicies(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	store, ok := policyStores[req.TenantID]
-	if !ok {
+	if _, ok := policyStores[req.TenantID]; !ok {
 		http.Error(w, "tenant not found", http.StatusNotFound)
 		return
 	}
-	file, ok := policyFiles[req.TenantID]
-	if !ok {
-		http.Error(w, "tenant not found", http.StatusNotFound)
-		return
-	}
-	if err := store.LoadPolicies(file); err != nil {
+	if policyBackend == "db" {
+		if err := loadPoliciesFromDB(r.Context(), req.TenantID); err != nil {
+			http.Error(w, "failed to reload policies", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		file, ok := policyFiles[req.TenantID]
+		if !ok {
+			http.Error(w, "tenant not found", http.StatusNotFound)
+			return
+		}
+		if err := policyStores[req.TenantID].LoadPolicies(file); err != nil {
+			auditLogger.Log(logger.Entry{
+				Level:         "error",
+				CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+				TenantID:      req.TenantID,
+				Action:        "reload",
+				Resource:      file,
+				Reason:        err.Error(),
+			})
+			http.Error(w, "failed to reload policies", http.StatusInternalServerError)
+			return
+		}
 		auditLogger.Log(logger.Entry{
-			Level:         "error",
+			Level:         "info",
 			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
 			TenantID:      req.TenantID,
 			Action:        "reload",
 			Resource:      file,
-			Reason:        err.Error(),
+			Decision:      "success",
 		})
-		http.Error(w, "failed to reload policies", http.StatusInternalServerError)
-		return
 	}
-	auditLogger.Log(logger.Entry{
-		Level:         "info",
-		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
-		TenantID:      req.TenantID,
-		Action:        "reload",
-		Resource:      file,
-		Decision:      "success",
-	})
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("policies reloaded"))
 }
@@ -289,6 +375,35 @@ func ValidatePolicy(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("policy is valid"))
 }
 
+func loadPoliciesFromDB(ctx context.Context, tenantID string) error {
+	policies, err := backend.LoadPolicies(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	store, ok := policyStores[tenantID]
+	if !ok {
+		store = policy.NewPolicyStore()
+		policyStores[tenantID] = store
+	}
+	store.ReplacePolicies(policies)
+	return nil
+}
+
+func watchPolicies() {
+	ticker := time.NewTicker(30 * time.Second)
+	for range ticker.C {
+		tenants, err := backend.ListTenants(context.Background())
+		if err != nil {
+			continue
+		}
+		for _, t := range tenants {
+			if _, ok := policyStores[t.ID]; ok {
+				loadPoliciesFromDB(context.Background(), t.ID)
+			}
+		}
+	}
+}
+
 // CreateTenant registers a new tenant with an empty PolicyStore.
 func CreateTenant(w http.ResponseWriter, r *http.Request) {
 	_, span := tracer.Start(r.Context(), "CreateTenant")
@@ -316,6 +431,9 @@ func CreateTenant(w http.ResponseWriter, r *http.Request) {
 	if err := backend.SaveTenant(r.Context(), tenant); err != nil {
 		http.Error(w, "failed to save tenant", http.StatusInternalServerError)
 		return
+	}
+	if policyBackend == "db" {
+		loadPoliciesFromDB(r.Context(), req.TenantID)
 	}
 	auditLogger.Log(logger.Entry{
 		Level:         "info",
@@ -360,11 +478,25 @@ func DeleteTenant(w http.ResponseWriter, r *http.Request) {
 
 // ListTenants returns all registered tenants.
 func ListTenants(w http.ResponseWriter, r *http.Request) {
-	list, err := backend.ListTenants(r.Context())
+	ctx, span := tracer.Start(r.Context(), "ListTenants")
+	defer span.End()
+	list, err := backend.ListTenants(ctx)
 	if err != nil {
+		auditLogger.Log(logger.Entry{
+			Level:         "error",
+			CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+			Action:        "tenant_list",
+			Reason:        err.Error(),
+		})
 		http.Error(w, "failed to list tenants", http.StatusInternalServerError)
 		return
 	}
+	auditLogger.Log(logger.Entry{
+		Level:         "info",
+		CorrelationID: middleware.CorrelationIDFromContext(r.Context()),
+		Action:        "tenant_list",
+		Decision:      "success",
+	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
 }

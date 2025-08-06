@@ -8,8 +8,9 @@ services:
     environment:
       - CLIENT_ID=${CLIENT_ID}
       - CLIENT_SECRET=${CLIENT_SECRET}
-      - JWT_SECRET=${JWT_SECRET}
       - PORT=${PORT}
+      - OIDC_ISSUERS=${OIDC_ISSUERS}
+      - OIDC_AUDIENCES=${OIDC_AUDIENCES}
     volumes:
       - ./configs:/app/configs
     restart: unless-stopped

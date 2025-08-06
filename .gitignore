@@ -1,5 +1,5 @@
 # Binaries
-authorization-service
+/authorization-service
 *.exe
 *.out
 
@@ -33,3 +33,4 @@ docker-compose.override.yml
 
 # Miscellaneous
 *.swp
+*.db

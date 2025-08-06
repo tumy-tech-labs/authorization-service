@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "authorization-service.fullname" . }}
+  labels:
+    {{- include "authorization-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "authorization-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "authorization-service.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.service.port }}"
+            - name: STORE_BACKEND
+              value: "{{ .Values.policyBackend }}"
+            - name: OIDC_ISSUERS
+              value: "{{ .Values.oidc.issuers }}"
+            - name: OIDC_AUDIENCES
+              value: "{{ .Values.oidc.audiences }}"
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          {{- if or .Values.oidc.clientID .Values.oidc.clientSecret .Values.secretEnv }}
+          envFrom:
+            - secretRef:
+                name: {{ include "authorization-service.fullname" . }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

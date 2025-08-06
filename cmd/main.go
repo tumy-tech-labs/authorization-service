@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/bradtumy/authorization-service/api"
+	"github.com/bradtumy/authorization-service/internal/telemetry"
 	"github.com/joho/godotenv"
 )
 
@@ -21,6 +23,13 @@ func main() {
 	if port == "" {
 		log.Fatal("PORT environment variable is not set")
 	}
+
+	ctx := context.Background()
+	shutdown, err := telemetry.InitTracer(ctx)
+	if err != nil {
+		log.Fatalf("failed to init tracing: %v", err)
+	}
+	defer func() { _ = shutdown(ctx) }()
 
 	router := api.SetupRouter()
 	log.Println("Starting server on :", port)

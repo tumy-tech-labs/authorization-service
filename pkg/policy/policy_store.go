@@ -71,6 +71,19 @@ func (ps *PolicyStore) LoadPolicies(filePath string) error {
 	return nil
 }
 
+// ReplacePolicies swaps the current policies with the provided list. Roles and
+// users remain untouched. This is primarily used when loading policies from a
+// database backend.
+func (ps *PolicyStore) ReplacePolicies(policies []Policy) {
+	newPolicies := make(map[string]Policy)
+	for _, p := range policies {
+		newPolicies[p.ID] = p
+	}
+	ps.mu.Lock()
+	ps.Policies = newPolicies
+	ps.mu.Unlock()
+}
+
 // GetPolicy retrieves a policy by its ID.
 func (ps *PolicyStore) GetPolicy(id string) (Policy, bool) {
 	ps.mu.RLock()

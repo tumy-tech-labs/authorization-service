@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/bradtumy/authorization-service/pkg/graph"
+	"github.com/bradtumy/authorization-service/pkg/remediation"
 )
 
 // PolicyEngine evaluates policies to determine access decisions.
@@ -31,6 +32,16 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		"resource": resource,
 		"action":   action,
 	}
+	for k, v := range env {
+		ctx[k] = v
+	}
+
+	addRemediation := func(dec Decision) Decision {
+		if !dec.Allow {
+			dec.Remediation = remediation.Suggest(dec.Context)
+		}
+		return dec
+	}
 
 	// Collect candidate subjects including delegation chain.
 	subjects := []string{subject}
@@ -57,7 +68,7 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		user, exists := pe.store.Users[subj]
 		if !exists {
 			if idx == 0 {
-				return Decision{Allow: false, Reason: "user not found", Context: ctx}
+				return addRemediation(Decision{Allow: false, Reason: "user not found", Context: ctx})
 			}
 			continue
 		}
@@ -106,12 +117,19 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 					}
 					for _, polAction := range policy.Action {
 						if matchResource && (polAction == "*" || polAction == action) {
-							if ok := evaluateConditions(policy.Conditions, env); !ok {
-								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: "conditions not satisfied", Context: ctx}
+							if ok, reason := evaluateConditions(policy.Conditions, env); !ok {
+								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: reason, Context: ctx}
 								if subj != subject {
 									dec.Delegator = subj
 								}
-								return dec
+								return addRemediation(dec)
+							}
+							if ok, reason := evaluateWhen(policy.When, env); !ok {
+								dec := Decision{Allow: false, PolicyID: policy.ID, Reason: reason, Context: ctx}
+								if subj != subject {
+									dec.Delegator = subj
+								}
+								return addRemediation(dec)
 							}
 							dec := Decision{PolicyID: policy.ID, Context: ctx}
 							if subj != subject {
@@ -125,7 +143,7 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 								dec.Allow = false
 								dec.Reason = "denied by policy"
 							}
-							return dec
+							return addRemediation(dec)
 						}
 					}
 				}
@@ -133,5 +151,5 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		}
 	}
 
-	return Decision{Allow: false, Reason: "no matching policy", Context: ctx}
+	return addRemediation(Decision{Allow: false, Reason: "no matching policy", Context: ctx})
 }

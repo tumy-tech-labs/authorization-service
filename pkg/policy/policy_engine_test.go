@@ -129,8 +129,68 @@ func TestEvaluateConditionUnsatisfied(t *testing.T) {
 	if decision.Allow {
 		t.Fatalf("expected access to be denied outside business hours")
 	}
-	if decision.Reason != "conditions not satisfied" {
+	if decision.Reason != "time" {
 		t.Fatalf("unexpected reason: %s", decision.Reason)
+	}
+	if len(decision.Remediation) == 0 || decision.Remediation[0] != "Try again during working hours" {
+		t.Fatalf("expected remediation for business hours, got %v", decision.Remediation)
+	}
+}
+
+func TestEvaluateWhenSatisfied(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["partner"] = Role{Name: "partner", Policies: []string{"policy1"}}
+	store.Users["bob"] = User{Username: "bob", Roles: []string{"partner"}}
+	store.Policies["policy1"] = Policy{
+		ID:       "policy1",
+		Subjects: []Subject{{Role: "partner"}},
+		Resource: []string{"dashboard"},
+		Action:   []string{"view"},
+		Effect:   "allow",
+		When:     []string{"context.time == \"business-hours\"", "context.risk < \"medium\""},
+	}
+	engine := NewPolicyEngine(store, graph.New())
+	env := map[string]string{"time": "business-hours", "risk": "low"}
+	decision := engine.Evaluate("bob", "dashboard", "view", env)
+	if !decision.Allow {
+		t.Fatalf("expected access to be allowed when when conditions satisfied")
+	}
+}
+
+func TestEvaluateWhenUnsatisfied(t *testing.T) {
+	store := NewPolicyStore()
+	store.Roles["partner"] = Role{Name: "partner", Policies: []string{"policy1"}}
+	store.Users["bob"] = User{Username: "bob", Roles: []string{"partner"}}
+	store.Policies["policy1"] = Policy{
+		ID:       "policy1",
+		Subjects: []Subject{{Role: "partner"}},
+		Resource: []string{"dashboard"},
+		Action:   []string{"view"},
+		Effect:   "allow",
+		When:     []string{"context.time == \"business-hours\"", "context.risk < \"medium\""},
+	}
+	engine := NewPolicyEngine(store, graph.New())
+	env := map[string]string{"time": "business-hours", "risk": "high"}
+	decision := engine.Evaluate("bob", "dashboard", "view", env)
+	if decision.Allow {
+		t.Fatalf("expected access to be denied when when conditions not satisfied")
+	}
+	if decision.Reason != "risk" {
+		t.Fatalf("unexpected reason: %s", decision.Reason)
+	}
+	if len(decision.Remediation) == 0 || decision.Remediation[0] != "Require MFA step-up" {
+		t.Fatalf("expected remediation for high risk, got %v", decision.Remediation)
+	}
+}
+
+func TestEvaluateContextIncluded(t *testing.T) {
+	store := NewPolicyStore()
+	store.Users["user1"] = User{Username: "user1"}
+	engine := NewPolicyEngine(store, graph.New())
+	env := map[string]string{"ip": "1.2.3.4"}
+	dec := engine.Evaluate("user1", "file1", "read", env)
+	if dec.Context["ip"] != "1.2.3.4" {
+		t.Fatalf("expected context to include env values")
 	}
 }
 
@@ -215,12 +275,12 @@ func TestEvaluateDelegationChainInvalid(t *testing.T) {
 	g := graph.New()
 	g.AddRelation("user:alice", "user:mary")
 
-        engine := NewPolicyEngine(store, g)
-        dec := engine.Evaluate("alice", "file1", "read", nil)
-       if dec.Allow {
-               t.Fatalf("expected delegation chain to deny access, got %#v", dec)
-       }
-       if dec.Delegator != "" {
-               t.Fatalf("unexpected delegator %q for failed delegation", dec.Delegator)
-       }
+	engine := NewPolicyEngine(store, g)
+	dec := engine.Evaluate("alice", "file1", "read", nil)
+	if dec.Allow {
+		t.Fatalf("expected delegation chain to deny access, got %#v", dec)
+	}
+	if dec.Delegator != "" {
+		t.Fatalf("unexpected delegator %q for failed delegation", dec.Delegator)
+	}
 }

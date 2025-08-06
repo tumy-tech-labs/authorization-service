@@ -25,4 +25,5 @@ type Policy struct {
 	Action      []string          `yaml:"action"`
 	Effect      string            `yaml:"effect"`
 	Conditions  map[string]string `yaml:"conditions"`
+	When        []string          `yaml:"when"`
 }
