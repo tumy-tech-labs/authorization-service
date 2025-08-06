@@ -11,6 +11,7 @@ services:
       - PORT=${PORT}
       - OIDC_ISSUERS=${OIDC_ISSUERS}
       - OIDC_AUDIENCES=${OIDC_AUDIENCES}
+    # Mount local configs (drop policies.yaml here)
     volumes:
       - ./configs:/app/configs
     restart: unless-stopped

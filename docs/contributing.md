@@ -24,5 +24,38 @@ Execute `go test ./...` and ensure linting passes before submitting a PR.
 ## Observability
 Check logs and metrics during development to diagnose failures.
 
+## Local Development
+
+Run with hot reload using [air](https://github.com/cosmtrek/air):
+
+```sh
+go install github.com/cosmtrek/air@latest
+air
+```
+
+Run tests:
+
+```sh
+make test
+```
+
+Run lint:
+
+```sh
+make lint
+```
+
+Run security scan:
+
+```sh
+make sec
+```
+
+Run integration tests:
+
+```sh
+make integration-test
+```
+
 ## Notes & Caveats
 Follow the [Code of Conduct](../CODE_OF_CONDUCT.md) and sign your commits if required.
