@@ -11,7 +11,18 @@ services:
       - PORT=${PORT}
       - OIDC_ISSUERS=${OIDC_ISSUERS}
       - OIDC_AUDIENCES=${OIDC_AUDIENCES}
+    command: ["./authorization-service", "--persist-users"]
+    depends_on:
+      - keycloak
     # Mount local configs (drop policies.yaml here)
     volumes:
       - ./configs:/app/configs
     restart: unless-stopped
+
+  keycloak:
+    build: ./docker/keycloak
+    ports:
+      - "8081:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
