@@ -145,6 +145,28 @@ curl -s -X POST http://localhost:8080/check-access \
 
 Examples live in [`examples/`](examples) and the Postman collection in [`postman/`](postman).
 
+## Managing Users Dynamically via API
+
+Users and their roles can be managed at runtime using the User Management API. All requests require a bearer token from a user with either the `TenantAdmin` or `PolicyAdmin` role.
+
+Create a user:
+
+```sh
+curl -X POST http://localhost:8080/user/create \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{"tenantID":"acme","username":"bob"}'
+```
+
+List users:
+
+```sh
+curl -H 'Authorization: Bearer <token>' \
+  'http://localhost:8080/user/list?tenantID=acme'
+```
+
+Additional endpoints support assigning roles, deleting users and fetching a single user. See [docs/users.md](docs/users.md) for details.
+
 ## License
 
 Apache 2.0 licensed. See [LICENSE](LICENSE).

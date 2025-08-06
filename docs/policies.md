@@ -33,3 +33,6 @@ Policy evaluation counters are exported as `policy_eval_count{decision,reason}`.
 
 ## Notes & Caveats
 Malformed policies will be rejected at load time; use `policy validate` to detect issues early.
+
+## Managing Users
+Roles referenced in policies are assigned to users dynamically. Manage users and their roles via the [User API](users.md).
