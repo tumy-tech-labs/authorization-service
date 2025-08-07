@@ -5,6 +5,7 @@ import (
 
 	"github.com/bradtumy/authorization-service/pkg/graph"
 	"github.com/bradtumy/authorization-service/pkg/remediation"
+	authuser "github.com/bradtumy/authorization-service/pkg/user"
 )
 
 // PolicyEngine evaluates policies to determine access decisions.
@@ -64,8 +65,15 @@ func (pe *PolicyEngine) Evaluate(subject, resource, action string, env map[strin
 		}
 	}
 
+	tenantID := env["tenantID"]
 	for idx, subj := range subjects {
 		user, exists := pe.store.Users[subj]
+		if !exists && tenantID != "" {
+			if u, err := authuser.Get(tenantID, subj); err == nil {
+				user = User{Username: u.Username, Roles: u.Roles}
+				exists = true
+			}
+		}
 		if !exists {
 			if idx == 0 {
 				return addRemediation(Decision{Allow: false, Reason: "user not found", Context: ctx})

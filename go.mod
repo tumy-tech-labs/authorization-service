@@ -21,6 +21,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0
 	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

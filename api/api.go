@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -16,7 +17,9 @@ import (
 	"github.com/bradtumy/authorization-service/pkg/policycompiler"
 	"github.com/bradtumy/authorization-service/pkg/store"
 	"github.com/bradtumy/authorization-service/pkg/tenant"
+	"github.com/bradtumy/authorization-service/pkg/user"
 	"github.com/bradtumy/authorization-service/pkg/validator"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,6 +27,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"strings"
 )
 
 var (
@@ -73,6 +77,14 @@ func init() {
 	defaultFile := os.Getenv("POLICY_FILE")
 	if defaultFile == "" {
 		defaultFile = "configs/policies.yaml"
+	}
+	if _, err := os.Stat(defaultFile); os.IsNotExist(err) {
+		for _, alt := range []string{"../" + defaultFile, "../../" + defaultFile} {
+			if _, err2 := os.Stat(alt); err2 == nil {
+				defaultFile = alt
+				break
+			}
+		}
 	}
 
 	store := policy.NewPolicyStore()
@@ -147,6 +159,57 @@ type ValidatePolicyRequest struct {
 	Policy   string `json:"policy"`
 }
 
+type CreateUserRequest struct {
+	TenantID string   `json:"tenantID"`
+	Username string   `json:"username"`
+	Roles    []string `json:"roles"`
+}
+
+type AssignRoleRequest struct {
+	TenantID string   `json:"tenantID"`
+	Username string   `json:"username"`
+	Roles    []string `json:"roles"`
+}
+
+type DeleteUserRequest struct {
+	TenantID string `json:"tenantID"`
+	Username string `json:"username"`
+}
+
+func subjectFromRequest(r *http.Request) (string, error) {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return "", errors.New("missing token")
+	}
+	tokenString := strings.TrimPrefix(auth, "Bearer ")
+	claims := jwt.MapClaims{}
+	parser := jwt.Parser{}
+	if _, _, err := parser.ParseUnverified(tokenString, claims); err != nil {
+		return "", err
+	}
+	if username, _ := claims["preferred_username"].(string); username != "" {
+		return username, nil
+	}
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return "", errors.New("missing subject")
+	}
+	return sub, nil
+}
+
+func requireAdmin(w http.ResponseWriter, r *http.Request, tenantID string) (string, bool) {
+	sub, err := subjectFromRequest(r)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return "", false
+	}
+	if !user.HasRole(tenantID, sub, "TenantAdmin", "PolicyAdmin") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return "", false
+	}
+	return sub, true
+}
+
 func SetupRouter() *mux.Router {
 	router := mux.NewRouter()
 	router.Use(middleware.TracingMiddleware)
@@ -161,6 +224,11 @@ func SetupRouter() *mux.Router {
 	router.HandleFunc("/tenant/create", CreateTenant).Methods("POST")
 	router.HandleFunc("/tenant/delete", DeleteTenant).Methods("POST")
 	router.HandleFunc("/tenant/list", ListTenants).Methods("GET")
+	router.HandleFunc("/user/create", CreateUser).Methods("POST")
+	router.HandleFunc("/user/assign-role", AssignRole).Methods("POST")
+	router.HandleFunc("/user/delete", DeleteUser).Methods("POST")
+	router.HandleFunc("/user/list", ListUsers).Methods("GET")
+	router.HandleFunc("/user/get", GetUser).Methods("GET")
 	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
 	return router
 }
@@ -186,6 +254,7 @@ func CheckAccess(w http.ResponseWriter, r *http.Request) {
 	if req.Conditions == nil {
 		req.Conditions = make(map[string]string)
 	}
+	req.Conditions["tenantID"] = req.TenantID
 	for k, v := range ctxVals {
 		req.Conditions[k] = v
 	}
@@ -250,6 +319,7 @@ func SimulateAccess(w http.ResponseWriter, r *http.Request) {
 	if req.Context == nil {
 		req.Context = make(map[string]string)
 	}
+	req.Context["tenantID"] = req.TenantID
 	decision := engine.Evaluate(req.Subject, req.Resource, req.Action, req.Context)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(decision)
@@ -499,4 +569,92 @@ func ListTenants(w http.ResponseWriter, r *http.Request) {
 	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
+}
+
+// CreateUser creates a new user under a tenant.
+func CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req CreateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := requireAdmin(w, r, req.TenantID); !ok {
+		return
+	}
+	u, err := user.Create(req.TenantID, req.Username, req.Roles)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(u)
+}
+
+// AssignRole assigns roles to an existing user.
+func AssignRole(w http.ResponseWriter, r *http.Request) {
+	var req AssignRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := requireAdmin(w, r, req.TenantID); !ok {
+		return
+	}
+	if err := user.AssignRoles(req.TenantID, req.Username, req.Roles); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// DeleteUser removes a user from the system.
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	var req DeleteUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := requireAdmin(w, r, req.TenantID); !ok {
+		return
+	}
+	if err := user.Delete(req.TenantID, req.Username); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// ListUsers returns all users for a tenant.
+func ListUsers(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenantID")
+	if tenantID == "" {
+		http.Error(w, "missing tenantID", http.StatusBadRequest)
+		return
+	}
+	if _, ok := requireAdmin(w, r, tenantID); !ok {
+		return
+	}
+	list := user.List(tenantID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(list)
+}
+
+// GetUser returns information for a specific user.
+func GetUser(w http.ResponseWriter, r *http.Request) {
+	tenantID := r.URL.Query().Get("tenantID")
+	username := r.URL.Query().Get("username")
+	if tenantID == "" || username == "" {
+		http.Error(w, "missing tenantID or username", http.StatusBadRequest)
+		return
+	}
+	if _, ok := requireAdmin(w, r, tenantID); !ok {
+		return
+	}
+	u, err := user.Get(tenantID, username)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(u)
 }

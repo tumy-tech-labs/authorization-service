@@ -1,4 +1,4 @@
-.PHONY: build run test up down logs
+.PHONY: build run test up down logs oidc-token
 
 APP=authorization-service
 CLI=authzctl
@@ -21,3 +21,9 @@ down:
 
 logs:
 	docker compose logs -f
+
+oidc-token:
+	curl -s -X POST \
+	  http://localhost:8081/realms/authz-service/protocol/openid-connect/token \
+	  -H 'Content-Type: application/x-www-form-urlencoded' \
+	  -d 'grant_type=password&client_id=authz-client&username=$(USER)&password=$(PASS)' | jq -r .access_token

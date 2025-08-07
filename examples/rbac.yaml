@@ -10,8 +10,8 @@ policies:
     description: Admins can read any file
     subjects:
       - role: admin
-    resources:
+    resource:
       - "*"
-    actions:
+    action:
       - read
     effect: allow

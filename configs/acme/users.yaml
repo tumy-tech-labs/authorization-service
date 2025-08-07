@@ -1,0 +1,5 @@
+users:
+  - username: alice
+    roles: [TenantAdmin]
+  - username: bob
+    roles: [User]

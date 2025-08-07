@@ -197,6 +197,100 @@
           ]
         }
       }
+    },
+    {
+      "name": "Create User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantID\": \"default\",\n  \"username\": \"bob\",\n  \"roles\": [\"viewer\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/create",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "create"]
+        }
+      }
+    },
+    {
+      "name": "Assign Role",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantID\": \"default\",\n  \"username\": \"bob\",\n  \"roles\": [\"editor\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/assign-role",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "assign-role"]
+        }
+      }
+    },
+    {
+      "name": "Delete User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantID\": \"default\",\n  \"username\": \"bob\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/delete",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "delete"]
+        }
+      }
+    },
+    {
+      "name": "List Users",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/user/list?tenantID=default",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "list"],
+          "query": [
+            {"key": "tenantID", "value": "default"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get User",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/user/get?tenantID=default&username=bob",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "get"],
+          "query": [
+            {"key": "tenantID", "value": "default"},
+            {"key": "username", "value": "bob"}
+          ]
+        }
+      }
     }
   ],
   "variable": [
